@@ -401,6 +401,38 @@ async function loadPasswordsFromJsonFile(autoMode = false) {
   return true;
 }
 
+function refreshHistoryUi(loadButton = null) {
+  renderCurrentView();
+  renderSections();
+  populateAddPasswordSectionSelect();
+  populateAddLinkSectionSelect();
+  updatePendingCounter();
+
+  if (loadButton && loadButton.parentNode) {
+    loadButton.remove();
+  }
+}
+
+async function initializeHistoryIfNeeded(autoMode = false, loadButton = null) {
+  if (historyLoaded) {
+    refreshHistoryUi(loadButton);
+    return true;
+  }
+
+  const loadedFromJson = await loadPasswordsFromJsonFile(autoMode);
+
+  if (!loadedFromJson) {
+    if (!autoMode) {
+      alert("No se pudo inicializar el historial. Selecciona la carpeta del repo para crear o cargar los JSON.");
+    }
+
+    return false;
+  }
+
+  refreshHistoryUi(loadButton);
+  return true;
+}
+
 async function savePasswordsToJsonFile() {
   if (!historyLoaded) {
     alert("Primero carga el historial antes de guardar cambios.");
@@ -2004,41 +2036,18 @@ document.addEventListener("DOMContentLoaded", () => {
   toolbar.appendChild(loadButton);
 
   loadButton.addEventListener("click", async () => {
-    const loadedFromJson = await loadPasswordsFromJsonFile(false);
-
-    if (!loadedFromJson) {
-      alert("No se cargó historial válido. No se guardará nada para evitar sobrescribir tu archivo.");
-      return;
-    }
-
-    renderCurrentView();
-    renderSections();
-    populateAddPasswordSectionSelect();
-    populateAddLinkSectionSelect();
-
-    if (loadButton && loadButton.parentNode) {
-      loadButton.remove();
-    }
+    await initializeHistoryIfNeeded(false, loadButton);
   });
 
   // Timer automático: se ejecuta una sola vez después de 3 segundos
   setTimeout(async () => {
     if (historyLoaded) return;
 
-    const loadedFromJson = await loadPasswordsFromJsonFile(true);
+    const loadedFromJson = await initializeHistoryIfNeeded(true, loadButton);
 
     if (!loadedFromJson) {
       console.warn("No se pudo cargar automáticamente. Usa el botón Cargar historial.");
       return;
-    }
-
-    renderCurrentView();
-    renderSections();
-    populateAddPasswordSectionSelect();
-    populateAddLinkSectionSelect();
-
-    if (loadButton && loadButton.parentNode) {
-      loadButton.remove();
     }
 
     console.log("Historial cargado automáticamente.");
@@ -2075,6 +2084,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   const addSectionForm = document.getElementById("addSectionForm");
+  const openAddSectionForm = document.getElementById("openAddSectionForm");
+  const toggleSectionForm = document.getElementById("toggleInlineAddSectionForm");
   const sectionNameInput = document.getElementById("sectionNameInput");
   const cancelAddSection = document.getElementById("cancelAddSection");
   const restoreSectionModal = document.getElementById("restoreSectionModal");
@@ -2090,9 +2101,23 @@ document.addEventListener("DOMContentLoaded", () => {
   const cancelDeleteSectionBtn = document.getElementById("cancelDeleteSectionBtn");
   const confirmDeleteSectionBtn = document.getElementById("confirmDeleteSectionBtn");
 
+  if (openAddSectionForm && toggleSectionForm) {
+    openAddSectionForm.addEventListener("click", async event => {
+      event.preventDefault();
+
+      const initialized = await initializeHistoryIfNeeded(false, loadButton);
+      if (!initialized) return;
+
+      toggleSectionForm.checked = true;
+    });
+  }
+
   if (addSectionForm && sectionNameInput) {
     addSectionForm.addEventListener("submit", async event => {
       event.preventDefault();
+
+      const initialized = await initializeHistoryIfNeeded(false, loadButton);
+      if (!initialized) return;
 
       const created = await createSection(sectionNameInput.value);
       if (!created) return;
@@ -2208,7 +2233,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const openAddPasswordButton = document.getElementById("openAddPasswordModal");
 
   if (openAddPasswordButton) {
-    openAddPasswordButton.addEventListener("click", () => {
+    openAddPasswordButton.addEventListener("click", async () => {
+      const initialized = await initializeHistoryIfNeeded(false, loadButton);
+      if (!initialized) return;
+
       if (selectedView === "pending") {
         openPendingModal("create");
         return;
@@ -2221,6 +2249,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       populateAddPasswordSectionSelect();
+      document.getElementById("addPasswordModal").classList.add("show");
     });
   }
 
