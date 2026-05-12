@@ -11,6 +11,7 @@ let selectedLinkId = null;
 let selectedPendingId = null;
 let selectedView = "passwords";
 let historyLoaded = false;
+let shouldAnimateCards = false;
 
 let directoryHandle = null;
 let passwordFileHandle = null;
@@ -413,6 +414,13 @@ function refreshHistoryUi(loadButton = null) {
   }
 }
 
+function applyCardCascade(article, index) {
+  if (!shouldAnimateCards) return;
+
+  article.classList.add("card-cascade-in");
+  article.style.setProperty("--card-delay", `${Math.min(index * 70, 560)}ms`);
+}
+
 async function initializeHistoryIfNeeded(autoMode = false, loadButton = null) {
   if (historyLoaded) {
     refreshHistoryUi(loadButton);
@@ -429,8 +437,30 @@ async function initializeHistoryIfNeeded(autoMode = false, loadButton = null) {
     return false;
   }
 
+  shouldAnimateCards = true;
   refreshHistoryUi(loadButton);
+  shouldAnimateCards = false;
   return true;
+}
+
+async function initializeHistoryWithTimeout(loadButton = null, timeoutMs = 3000) {
+  let finished = false;
+
+  const timeoutId = setTimeout(() => {
+    if (finished || historyLoaded) return;
+
+    alert("No se pudieron cargar los datos en 3 segundos. Usa el boton de cargar historial o intenta de nuevo.");
+  }, timeoutMs);
+
+  const loaded = await initializeHistoryIfNeeded(true, loadButton);
+  finished = true;
+  clearTimeout(timeoutId);
+
+  if (!loaded) {
+    console.warn("No se pudo cargar automáticamente. Usa el botón Cargar historial.");
+  }
+
+  return loaded;
 }
 
 async function savePasswordsToJsonFile() {
@@ -637,9 +667,10 @@ function renderPasswords(list = getVisiblePasswords()) {
     return;
   }
 
-  list.forEach(item => {
+  list.forEach((item, index) => {
     const article = document.createElement("article");
     article.className = "password-card";
+    applyCardCascade(article, index);
 
     article.innerHTML = `
       <div class="password-info">
@@ -648,7 +679,17 @@ function renderPasswords(list = getVisiblePasswords()) {
         </div>
 
         <div>
-          <h4>${escapeHtml(item.platform)}</h4>
+          <div class="card-title-row">
+            <h4>${escapeHtml(item.platform)}</h4>
+            <button
+              class="inline-copy-btn share-password-btn"
+              type="button"
+              title="Compartir credenciales"
+              aria-label="Compartir credenciales"
+            >
+              <i class="bi bi-share"></i>
+            </button>
+          </div>
           <p>${escapeHtml(item.username)}</p>
           <p class="card-copy-row">
             <span>
@@ -700,14 +741,6 @@ function renderPasswords(list = getVisiblePasswords()) {
               <i class="bi bi-clipboard"></i>
             </button>
 
-            <button
-              class="inline-copy-btn share-password-btn"
-              type="button"
-              title="Compartir credenciales"
-              aria-label="Compartir credenciales"
-            >
-              <i class="bi bi-share"></i>
-            </button>
           </p>
           <span>Seccion: ${escapeHtml(getSectionName(item.sectionId))}</span>
         </div>
@@ -858,9 +891,10 @@ function renderLinks(list = getVisibleLinks()) {
     return;
   }
 
-  list.forEach(item => {
+  list.forEach((item, index) => {
     const article = document.createElement("article");
     article.className = "password-card";
+    applyCardCascade(article, index);
 
     article.innerHTML = `
       <div class="password-info">
@@ -1032,9 +1066,10 @@ function renderPendingTasks(list = getVisiblePendingTasks()) {
     return;
   }
 
-  list.forEach(item => {
+  list.forEach((item, index) => {
     const article = document.createElement("article");
     article.className = `password-card pending-card pending-card-${item.color}`;
+    applyCardCascade(article, index);
 
     article.innerHTML = `
       <div class="password-info">
@@ -2039,19 +2074,11 @@ document.addEventListener("DOMContentLoaded", () => {
     await initializeHistoryIfNeeded(false, loadButton);
   });
 
-  // Timer automático: se ejecuta una sola vez después de 3 segundos
-  setTimeout(async () => {
-    if (historyLoaded) return;
-
-    const loadedFromJson = await initializeHistoryIfNeeded(true, loadButton);
-
-    if (!loadedFromJson) {
-      console.warn("No se pudo cargar automáticamente. Usa el botón Cargar historial.");
-      return;
+  initializeHistoryWithTimeout(loadButton).then(loadedFromJson => {
+    if (loadedFromJson) {
+      console.log("Historial cargado automáticamente.");
     }
-
-    console.log("Historial cargado automáticamente.");
-  }, 3000);
+  });
 
   const searchInput = document.querySelector(".search-input");
 
