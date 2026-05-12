@@ -12,6 +12,7 @@ let selectedPendingId = null;
 let selectedView = "passwords";
 let historyLoaded = false;
 let shouldAnimateCards = false;
+let animatedViews = new Set();
 
 let directoryHandle = null;
 let passwordFileHandle = null;
@@ -437,9 +438,7 @@ async function initializeHistoryIfNeeded(autoMode = false, loadButton = null) {
     return false;
   }
 
-  shouldAnimateCards = true;
   refreshHistoryUi(loadButton);
-  shouldAnimateCards = false;
   return true;
 }
 
@@ -1124,17 +1123,25 @@ function renderPendingTasks(list = getVisiblePendingTasks()) {
 function renderCurrentView() {
   updatePendingCounter();
 
+  shouldAnimateCards = historyLoaded && !animatedViews.has(selectedView);
+
   if (selectedView === "pending") {
     renderPendingTasks();
+    if (shouldAnimateCards) animatedViews.add(selectedView);
+    shouldAnimateCards = false;
     return;
   }
 
   if (selectedView === "links") {
     renderLinks();
+    if (shouldAnimateCards) animatedViews.add(selectedView);
+    shouldAnimateCards = false;
     return;
   }
 
   renderPasswords();
+  if (shouldAnimateCards) animatedViews.add(selectedView);
+  shouldAnimateCards = false;
 }
 
 function renderSections() {
