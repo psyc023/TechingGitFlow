@@ -386,20 +386,36 @@ function renderPasswords(list = getVisiblePasswords()) {
       </div>
 
       <div class="card-notes">
-        <label>Notas</label>
-        <textarea
-          class="card-note-input"
-          placeholder="Escribe una nota para esta contraseña"
-        >${escapeHtml(item.note || "")}</textarea>
+        <button class="note-dropdown-btn" type="button" aria-expanded="false">
+          <span>Nota</span>
+          <span class="note-arrow">▼</span>
+        </button>
 
-        <div class="card-note-actions">
-          <button class="btn save-note-btn" type="button">
-            Guardar
-          </button>
-        </div>
+        <div class="card-note-panel">
+          <div class="card-note-preview">
+            ${escapeHtml(item.note || "Sin notas guardadas")}
+          </div>
 
-        <div class="card-note-preview">
-          ${escapeHtml(item.note || "Sin notas guardadas")}
+          <div class="card-note-read-actions">
+            <button class="btn edit-note-btn" type="button">
+              Editar
+            </button>
+          </div>
+
+          <textarea
+            class="card-note-input"
+            placeholder="Escribe una nota para esta contraseña"
+          >${escapeHtml(item.note || "")}</textarea>
+
+          <div class="card-note-actions">
+            <button class="btn cancel-note-btn" type="button">
+              Cancelar
+            </button>
+
+            <button class="btn save-note-btn" type="button">
+              Guardar
+            </button>
+          </div>
         </div>
       </div>
 
@@ -432,6 +448,28 @@ function renderPasswords(list = getVisiblePasswords()) {
       });
     });
 
+    const notesContainer = article.querySelector(".card-notes");
+    const noteDropdownButton = article.querySelector(".note-dropdown-btn");
+    const editNoteButton = article.querySelector(".edit-note-btn");
+
+    noteDropdownButton.addEventListener("click", () => {
+      const isOpen = notesContainer.classList.toggle("is-open");
+      notesContainer.classList.remove("is-editing");
+      noteDropdownButton.setAttribute("aria-expanded", String(isOpen));
+    });
+
+    editNoteButton.addEventListener("click", () => {
+      notesContainer.classList.add("is-editing");
+      article.querySelector(".card-note-input").focus();
+    });
+
+    article.querySelector(".cancel-note-btn").addEventListener("click", () => {
+      const noteInput = article.querySelector(".card-note-input");
+
+      noteInput.value = item.note || "";
+      notesContainer.classList.remove("is-editing");
+    });
+
     article.querySelector(".save-note-btn").addEventListener("click", async () => {
       const noteInput = article.querySelector(".card-note-input");
       const notePreview = article.querySelector(".card-note-preview");
@@ -439,20 +477,15 @@ function renderPasswords(list = getVisiblePasswords()) {
       const saved = await savePasswordNote(item.id, noteInput.value);
       if (!saved) return;
 
+      item.note = noteInput.value.trim();
       notePreview.textContent = noteInput.value.trim() || "Sin notas guardadas";
-      article.classList.add("show-note");
+      notesContainer.classList.remove("is-open");
+      notesContainer.classList.remove("is-editing");
+      noteDropdownButton.setAttribute("aria-expanded", "false");
     });
 
     article.querySelector(".delete-btn").addEventListener("click", () => {
       openDelete(item.id);
-    });
-
-    article.addEventListener("click", event => {
-      if (event.target.closest("button, input, textarea, select, label, a")) {
-        return;
-      }
-
-      article.classList.toggle("show-note");
     });
 
     passwordList.appendChild(article);
