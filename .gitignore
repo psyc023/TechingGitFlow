@@ -1,7 +1,0 @@
-# JSON history files
-*.json
-
-# Optional exceptions
-!package.json
-!package-lock.json
-!tsconfig.json
