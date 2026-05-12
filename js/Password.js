@@ -3,6 +3,7 @@ let links = [];
 let sections = [];
 let selectedSectionId = "";
 let selectedPasswordId = null;
+let selectedLinkId = null;
 let selectedView = "passwords";
 let historyLoaded = false;
 
@@ -484,6 +485,15 @@ function renderPasswords(list = getVisiblePasswords()) {
             >
               <i class="bi bi-clipboard"></i>
             </button>
+
+            <button
+              class="inline-copy-btn share-password-btn"
+              type="button"
+              title="Compartir credenciales"
+              aria-label="Compartir credenciales"
+            >
+              <i class="bi bi-share"></i>
+            </button>
           </p>
           <span>Seccion: ${escapeHtml(getSectionName(item.sectionId))}</span>
         </div>
@@ -548,8 +558,17 @@ function renderPasswords(list = getVisiblePasswords()) {
 
     article.querySelectorAll(".inline-copy-btn").forEach(button => {
       button.addEventListener("click", () => {
-        copyPassword(button.dataset.copyValue);
+        if (button.dataset.copyValue) {
+          copyPassword(button.dataset.copyValue);
+        }
       });
+    });
+
+    article.querySelector(".share-password-btn").addEventListener("click", () => {
+      copyText(
+        `Email: ${item.email}\nContraseña: ${item.password}`,
+        "Email y contraseña copiados."
+      );
     });
 
     const notesContainer = article.querySelector(".card-notes");
@@ -692,6 +711,10 @@ function renderLinks(list = getVisibleLinks()) {
           <i class="bi bi-box-arrow-up-right"></i>
         </a>
 
+        <button class="btn update-btn" type="button" title="Actualizar link" aria-label="Actualizar link">
+          <i class="bi bi-pencil-square"></i>
+        </button>
+
         <button class="btn delete-btn" type="button" title="Eliminar link" aria-label="Eliminar link">
           <i class="bi bi-trash"></i>
         </button>
@@ -738,6 +761,10 @@ function renderLinks(list = getVisibleLinks()) {
       notesContainer.classList.remove("is-open");
       notesContainer.classList.remove("is-editing");
       noteDropdownButton.setAttribute("aria-expanded", "false");
+    });
+
+    article.querySelector(".update-btn").addEventListener("click", () => {
+      openUpdateLink(item.id);
     });
 
     article.querySelector(".delete-btn").addEventListener("click", () => {
@@ -982,6 +1009,43 @@ async function createLink(linkData) {
   return true;
 }
 
+async function updateLink(id, updatedData) {
+  if (!historyLoaded) {
+    alert("Primero carga el historial.");
+    return false;
+  }
+
+  const sectionId = getPasswordSectionId(updatedData.sectionId);
+
+  if (!sectionId) {
+    alert("Selecciona una seccion para guardar el link.");
+    return false;
+  }
+
+  const url = normalizeUrl(updatedData.url);
+
+  if (!url) {
+    alert("Ingresa un link valido.");
+    return false;
+  }
+
+  links = links.map(item =>
+    item.id === id
+      ? {
+          ...item,
+          name: updatedData.name,
+          url,
+          sectionId,
+          updatedAt: nowText()
+        }
+      : item
+  );
+
+  renderLinks();
+  await saveLinksToJsonFile();
+  return true;
+}
+
 async function updatePassword(id, updatedData) {
   if (!historyLoaded) {
     alert("Primero carga el historial.");
@@ -1153,6 +1217,28 @@ function openDetails(id) {
 
 function openUpdate(id) {
   openPasswordModal(id, "edit");
+}
+
+function openUpdateLink(id) {
+  if (!historyLoaded) {
+    alert("Primero carga el historial.");
+    return;
+  }
+
+  selectedLinkId = id;
+
+  const item = links.find(link => link.id === id);
+  if (!item) return;
+
+  const updateLinkModal = document.getElementById("updateLinkModal");
+  const updateLinkSection = document.getElementById("updateLinkSection");
+  const inputs = updateLinkModal.querySelectorAll("input");
+
+  populateSectionSelect(updateLinkSection, item.sectionId);
+  inputs[0].value = item.name;
+  inputs[1].value = item.url;
+
+  updateLinkModal.classList.add("show");
 }
 
 function openDelete(id) {
@@ -1340,6 +1426,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const cancelAddLink = document.getElementById("cancelAddLink");
   const addLinkForm = document.querySelector("#addLinkModal .modal-form");
   const addLinkSection = document.getElementById("addLinkSection");
+  const updateLinkModal = document.getElementById("updateLinkModal");
+  const closeUpdateLinkModal = document.getElementById("closeUpdateLinkModal");
+  const cancelUpdateLink = document.getElementById("cancelUpdateLink");
+  const updateLinkForm = document.querySelector("#updateLinkModal .modal-form");
+  const updateLinkSection = document.getElementById("updateLinkSection");
 
   if (closeAddLinkModal) {
     closeAddLinkModal.addEventListener("click", () => {
@@ -1377,6 +1468,44 @@ document.addEventListener("DOMContentLoaded", () => {
 
       addLinkForm.reset();
       addLinkModal.classList.remove("show");
+    });
+  }
+
+  if (closeUpdateLinkModal) {
+    closeUpdateLinkModal.addEventListener("click", () => {
+      updateLinkModal.classList.remove("show");
+    });
+  }
+
+  if (cancelUpdateLink) {
+    cancelUpdateLink.addEventListener("click", () => {
+      updateLinkModal.classList.remove("show");
+    });
+  }
+
+  if (updateLinkModal) {
+    updateLinkModal.addEventListener("click", event => {
+      if (event.target === updateLinkModal) {
+        updateLinkModal.classList.remove("show");
+      }
+    });
+  }
+
+  if (updateLinkForm) {
+    updateLinkForm.addEventListener("submit", async event => {
+      event.preventDefault();
+
+      const inputs = updateLinkForm.querySelectorAll("input");
+
+      const saved = await updateLink(selectedLinkId, {
+        sectionId: updateLinkSection ? updateLinkSection.value : "",
+        name: inputs[0].value.trim(),
+        url: inputs[1].value.trim()
+      });
+
+      if (!saved) return;
+
+      updateLinkModal.classList.remove("show");
     });
   }
 
