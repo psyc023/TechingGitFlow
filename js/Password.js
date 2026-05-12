@@ -256,6 +256,12 @@ async function ensureJsonFile(autoMode = false) {
   }
 }
 
+async function writeJsonArray(fileHandle, data = []) {
+  const writable = await fileHandle.createWritable();
+  await writable.write(JSON.stringify(data, null, 2));
+  await writable.close();
+}
+
 async function loadSectionsFromJsonFile(autoMode = false) {
   const hasFile = await ensureJsonFile(autoMode);
   if (!hasFile) return false;
@@ -264,7 +270,10 @@ async function loadSectionsFromJsonFile(autoMode = false) {
   const text = await file.text();
 
   if (!text.trim()) {
-    await saveSectionsToJsonFile();
+    sections = [];
+    keepValidSelectedSection();
+    saveSectionsToLocalStorage();
+    await writeJsonArray(sectionFileHandle, []);
     return true;
   }
 
@@ -327,10 +336,20 @@ async function loadPasswordsFromJsonFile(autoMode = false) {
   const text = await file.text();
 
   if (!text.trim()) {
-    if (!autoMode) {
-      alert("El archivo passwords-history.json está vacío.");
-    }
-    return false;
+    passwords = [];
+    await writeJsonArray(passwordFileHandle, []);
+
+    const loadedSections = await loadSectionsFromJsonFile(autoMode);
+    if (!loadedSections) return false;
+
+    const loadedLinks = await loadLinksFromJsonFile(autoMode);
+    if (!loadedLinks) return false;
+
+    const loadedPendingTasks = await loadPendingTasksFromJsonFile(autoMode);
+    if (!loadedPendingTasks) return false;
+
+    historyLoaded = true;
+    return true;
   }
 
   let data;
@@ -420,6 +439,7 @@ async function loadLinksFromJsonFile(autoMode = false) {
 
   if (!text.trim()) {
     links = [];
+    await writeJsonArray(linkFileHandle, []);
     return true;
   }
 
@@ -495,6 +515,7 @@ async function loadPendingTasksFromJsonFile(autoMode = false) {
 
   if (!text.trim()) {
     pendingTasks = [];
+    await writeJsonArray(pendingFileHandle, []);
     return true;
   }
 
