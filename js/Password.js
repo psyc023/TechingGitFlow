@@ -1,15 +1,19 @@
 let passwords = [];
+let links = [];
 let sections = [];
 let selectedSectionId = "";
 let selectedPasswordId = null;
+let selectedView = "passwords";
 let historyLoaded = false;
 
 let directoryHandle = null;
 let passwordFileHandle = null;
 let sectionFileHandle = null;
+let linkFileHandle = null;
 
 const JSON_FILE_NAME = "passwords-history.json";
 const SECTIONS_JSON_FILE_NAME = "sections-history.json";
+const LINKS_JSON_FILE_NAME = "links-history.json";
 const SECTIONS_STORAGE_KEY = "password-manager-sections";
 
 /* =========================
@@ -136,6 +140,12 @@ function getVisiblePasswords() {
     : passwords;
 }
 
+function getVisibleLinks() {
+  return selectedSectionId
+    ? links.filter(item => item.sectionId === selectedSectionId)
+    : links;
+}
+
 function keepValidSelectedSection() {
   if (selectedSectionId && !sections.some(section => section.id === selectedSectionId)) {
     selectedSectionId = "";
@@ -180,6 +190,10 @@ async function ensureJsonFile(autoMode = false) {
     });
 
     sectionFileHandle = await directoryHandle.getFileHandle(SECTIONS_JSON_FILE_NAME, {
+      create: true
+    });
+
+    linkFileHandle = await directoryHandle.getFileHandle(LINKS_JSON_FILE_NAME, {
       create: true
     });
 
@@ -305,6 +319,9 @@ async function loadPasswordsFromJsonFile(autoMode = false) {
   const loadedSections = await loadSectionsFromJsonFile(autoMode);
   if (!loadedSections) return false;
 
+  const loadedLinks = await loadLinksFromJsonFile(autoMode);
+  if (!loadedLinks) return false;
+
   historyLoaded = true;
   return true;
 }
@@ -331,6 +348,77 @@ async function savePasswordsToJsonFile() {
   }));
 
   const writable = await passwordFileHandle.createWritable();
+  await writable.write(JSON.stringify(data, null, 2));
+  await writable.close();
+}
+
+async function loadLinksFromJsonFile(autoMode = false) {
+  const hasFile = await ensureJsonFile(autoMode);
+  if (!hasFile) return false;
+
+  const file = await linkFileHandle.getFile();
+  const text = await file.text();
+
+  if (!text.trim()) {
+    links = [];
+    return true;
+  }
+
+  let data;
+
+  try {
+    data = JSON.parse(text);
+  } catch (error) {
+    console.error("JSON de links invalido:", error);
+
+    if (!autoMode) {
+      alert("El archivo links-history.json tiene formato invalido.");
+    }
+
+    return false;
+  }
+
+  if (!Array.isArray(data)) {
+    if (!autoMode) {
+      alert("El historial de links debe ser un arreglo JSON.");
+    }
+
+    return false;
+  }
+
+  links = data.map(item => ({
+    id: item.id || generateId(),
+    name: item.name || item.title || "",
+    url: item.url || item.link || "",
+    sectionId: item.sectionId || "",
+    note: item.note || item.notes || "",
+    createdAt: item.createdAt || nowText(),
+    updatedAt: item.updatedAt || nowText()
+  }));
+
+  return true;
+}
+
+async function saveLinksToJsonFile() {
+  if (!historyLoaded) {
+    alert("Primero carga el historial antes de guardar cambios.");
+    return;
+  }
+
+  const hasFile = await ensureJsonFile(false);
+  if (!hasFile) return;
+
+  const data = links.map(item => ({
+    id: item.id,
+    name: item.name,
+    url: item.url,
+    sectionId: item.sectionId || "",
+    note: item.note || "",
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt
+  }));
+
+  const writable = await linkFileHandle.createWritable();
   await writable.write(JSON.stringify(data, null, 2));
   await writable.close();
 }
@@ -375,20 +463,36 @@ function renderPasswords(list = getVisiblePasswords()) {
           <p>${escapeHtml(item.username)}</p>
           <p class="card-copy-row">
             <span>Email: ${escapeHtml(item.email)}</span>
-            <button class="inline-copy-btn" type="button" data-copy-value="${escapeHtml(item.email)}">copiar</button>
+            <button
+              class="inline-copy-btn"
+              type="button"
+              data-copy-value="${escapeHtml(item.email)}"
+              title="Copiar email"
+              aria-label="Copiar email"
+            >
+              <i class="bi bi-clipboard"></i>
+            </button>
           </p>
           <p class="card-copy-row">
             <span>Contraseña: ${escapeHtml(item.password)}</span>
-            <button class="inline-copy-btn" type="button" data-copy-value="${escapeHtml(item.password)}">copiar</button>
+            <button
+              class="inline-copy-btn"
+              type="button"
+              data-copy-value="${escapeHtml(item.password)}"
+              title="Copiar contraseña"
+              aria-label="Copiar contraseña"
+            >
+              <i class="bi bi-clipboard"></i>
+            </button>
           </p>
           <span>Seccion: ${escapeHtml(getSectionName(item.sectionId))}</span>
         </div>
       </div>
 
       <div class="card-notes">
-        <button class="note-dropdown-btn" type="button" aria-expanded="false">
+        <button class="note-dropdown-btn" type="button" aria-expanded="false" title="Ver nota" aria-label="Ver nota">
           <span>Nota</span>
-          <span class="note-arrow">▼</span>
+          <i class="bi bi-chevron-down note-arrow"></i>
         </button>
 
         <div class="card-note-panel">
@@ -397,8 +501,8 @@ function renderPasswords(list = getVisiblePasswords()) {
           </div>
 
           <div class="card-note-read-actions">
-            <button class="btn edit-note-btn" type="button">
-              Editar
+            <button class="btn edit-note-btn" type="button" title="Editar nota" aria-label="Editar nota">
+              <i class="bi bi-pencil"></i>
             </button>
           </div>
 
@@ -408,28 +512,28 @@ function renderPasswords(list = getVisiblePasswords()) {
           >${escapeHtml(item.note || "")}</textarea>
 
           <div class="card-note-actions">
-            <button class="btn cancel-note-btn" type="button">
-              Cancelar
+            <button class="btn cancel-note-btn" type="button" title="Cancelar edicion" aria-label="Cancelar edicion">
+              <i class="bi bi-x-circle"></i>
             </button>
 
-            <button class="btn save-note-btn" type="button">
-              Guardar
+            <button class="btn save-note-btn" type="button" title="Guardar nota" aria-label="Guardar nota">
+              <i class="bi bi-save"></i>
             </button>
           </div>
         </div>
       </div>
 
       <div class="card-actions">
-        <button class="btn details-btn" type="button" data-id="${escapeHtml(item.id)}">
-          Detalles
+        <button class="btn details-btn" type="button" data-id="${escapeHtml(item.id)}" title="Detalles" aria-label="Detalles">
+          <i class="bi bi-info-circle"></i>
         </button>
 
-        <button class="btn update-btn" type="button" data-id="${escapeHtml(item.id)}">
-          Actualizar
+        <button class="btn update-btn" type="button" data-id="${escapeHtml(item.id)}" title="Actualizar" aria-label="Actualizar">
+          <i class="bi bi-pencil-square"></i>
         </button>
 
-        <button class="btn delete-btn" type="button" data-id="${escapeHtml(item.id)}">
-          Eliminar
+        <button class="btn delete-btn" type="button" data-id="${escapeHtml(item.id)}" title="Eliminar" aria-label="Eliminar">
+          <i class="bi bi-trash"></i>
         </button>
       </div>
     `;
@@ -492,6 +596,167 @@ function renderPasswords(list = getVisiblePasswords()) {
   });
 }
 
+function normalizeUrl(url) {
+  const value = url.trim();
+  if (!value) return "";
+
+  return /^https?:\/\//i.test(value) ? value : `https://${value}`;
+}
+
+function renderLinks(list = getVisibleLinks()) {
+  const passwordList = document.querySelector(".password-list");
+  if (!passwordList) return;
+
+  passwordList.innerHTML = "";
+
+  if (list.length === 0) {
+    passwordList.innerHTML = `
+      <article class="password-card">
+        <div class="password-info">
+          <div class="platform-icon">?</div>
+          <div>
+            <h4>No links</h4>
+            <p>No records found</p>
+            <span>Add your first link</span>
+          </div>
+        </div>
+      </article>
+    `;
+    return;
+  }
+
+  list.forEach(item => {
+    const article = document.createElement("article");
+    article.className = "password-card";
+
+    article.innerHTML = `
+      <div class="password-info">
+        <div class="platform-icon">
+          ${escapeHtml((item.name || "?").charAt(0).toUpperCase())}
+        </div>
+
+        <div>
+          <h4>${escapeHtml(item.name)}</h4>
+          <p class="card-copy-row">
+            <span>Link: ${escapeHtml(item.url)}</span>
+            <button
+              class="inline-copy-btn"
+              type="button"
+              data-copy-value="${escapeHtml(item.url)}"
+              title="Copiar link"
+              aria-label="Copiar link"
+            >
+              <i class="bi bi-clipboard"></i>
+            </button>
+          </p>
+          <span>Seccion: ${escapeHtml(getSectionName(item.sectionId))}</span>
+        </div>
+      </div>
+
+      <div class="card-notes">
+        <button class="note-dropdown-btn" type="button" aria-expanded="false" title="Ver nota" aria-label="Ver nota">
+          <span>Nota</span>
+          <i class="bi bi-chevron-down note-arrow"></i>
+        </button>
+
+        <div class="card-note-panel">
+          <div class="card-note-preview">
+            ${escapeHtml(item.note || "Sin notas guardadas")}
+          </div>
+
+          <div class="card-note-read-actions">
+            <button class="btn edit-note-btn" type="button" title="Editar nota" aria-label="Editar nota">
+              <i class="bi bi-pencil"></i>
+            </button>
+          </div>
+
+          <textarea
+            class="card-note-input"
+            placeholder="Escribe una nota para este link"
+          >${escapeHtml(item.note || "")}</textarea>
+
+          <div class="card-note-actions">
+            <button class="btn cancel-note-btn" type="button" title="Cancelar edicion" aria-label="Cancelar edicion">
+              <i class="bi bi-x-circle"></i>
+            </button>
+
+            <button class="btn save-note-btn" type="button" title="Guardar nota" aria-label="Guardar nota">
+              <i class="bi bi-save"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-actions">
+        <a class="btn details-btn" href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer" title="Abrir link" aria-label="Abrir link">
+          <i class="bi bi-box-arrow-up-right"></i>
+        </a>
+
+        <button class="btn delete-btn" type="button" title="Eliminar link" aria-label="Eliminar link">
+          <i class="bi bi-trash"></i>
+        </button>
+      </div>
+    `;
+
+    article.querySelectorAll(".inline-copy-btn").forEach(button => {
+      button.addEventListener("click", () => {
+        copyText(button.dataset.copyValue, "Link copiado.");
+      });
+    });
+
+    const notesContainer = article.querySelector(".card-notes");
+    const noteDropdownButton = article.querySelector(".note-dropdown-btn");
+    const editNoteButton = article.querySelector(".edit-note-btn");
+
+    noteDropdownButton.addEventListener("click", () => {
+      const isOpen = notesContainer.classList.toggle("is-open");
+      notesContainer.classList.remove("is-editing");
+      noteDropdownButton.setAttribute("aria-expanded", String(isOpen));
+    });
+
+    editNoteButton.addEventListener("click", () => {
+      notesContainer.classList.add("is-editing");
+      article.querySelector(".card-note-input").focus();
+    });
+
+    article.querySelector(".cancel-note-btn").addEventListener("click", () => {
+      const noteInput = article.querySelector(".card-note-input");
+
+      noteInput.value = item.note || "";
+      notesContainer.classList.remove("is-editing");
+    });
+
+    article.querySelector(".save-note-btn").addEventListener("click", async () => {
+      const noteInput = article.querySelector(".card-note-input");
+      const notePreview = article.querySelector(".card-note-preview");
+
+      const saved = await saveLinkNote(item.id, noteInput.value);
+      if (!saved) return;
+
+      item.note = noteInput.value.trim();
+      notePreview.textContent = noteInput.value.trim() || "Sin notas guardadas";
+      notesContainer.classList.remove("is-open");
+      notesContainer.classList.remove("is-editing");
+      noteDropdownButton.setAttribute("aria-expanded", "false");
+    });
+
+    article.querySelector(".delete-btn").addEventListener("click", () => {
+      openDeleteLink(item.id);
+    });
+
+    passwordList.appendChild(article);
+  });
+}
+
+function renderCurrentView() {
+  if (selectedView === "links") {
+    renderLinks();
+    return;
+  }
+
+  renderPasswords();
+}
+
 function renderSections() {
   const sectionList = document.getElementById("sectionList");
   if (!sectionList) return;
@@ -509,8 +774,9 @@ function renderSections() {
   allButton.addEventListener("click", () => {
     selectedSectionId = "";
     renderSections();
-    renderPasswords();
+    renderCurrentView();
     populateAddPasswordSectionSelect();
+    populateAddLinkSectionSelect();
   });
 
   sectionList.appendChild(allButton);
@@ -539,8 +805,9 @@ function renderSections() {
     button.addEventListener("click", () => {
       selectedSectionId = section.id;
       renderSections();
-      renderPasswords();
+      renderCurrentView();
       populateAddPasswordSectionSelect();
+      populateAddLinkSectionSelect();
     });
 
     sectionList.appendChild(button);
@@ -568,6 +835,54 @@ function populateAddPasswordSectionSelect() {
   );
 }
 
+function populateAddLinkSectionSelect() {
+  populateSectionSelect(
+    document.getElementById("addLinkSection"),
+    selectedSectionId
+  );
+}
+
+function setActiveView(view) {
+  selectedView = view;
+  document.body.dataset.activeView = selectedView;
+
+  const isLinksView = selectedView === "links";
+  const heroTitle = document.querySelector(".hero-section h1");
+  const heroDescription = document.getElementById("heroDescription");
+  const addButton = document.getElementById("openAddPasswordModal");
+
+  document.querySelectorAll(".vault-tab").forEach(button => {
+    const isActive = button.dataset.view === selectedView;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-selected", String(isActive));
+  });
+
+  if (heroTitle) {
+    heroTitle.textContent = isLinksView
+      ? "Administrador de Links"
+      : "Administrador de Contraseñas";
+  }
+
+  if (heroDescription) {
+    heroDescription.textContent = isLinksView
+      ? "Guarda accesos rapidos a paginas y empresas"
+      : "Administra tus contraseñas de forma rápida";
+  }
+
+  if (addButton) {
+    addButton.title = isLinksView ? "Agregar link" : "Agregar contraseña";
+    addButton.setAttribute(
+      "aria-label",
+      isLinksView ? "Agregar link" : "Agregar contraseña"
+    );
+    addButton.innerHTML = isLinksView
+      ? '<i class="bi bi-link-45deg"></i>'
+      : '<i class="bi bi-key-fill"></i>';
+  }
+
+  renderCurrentView();
+}
+
 /* =========================
    CRUD
 ========================= */
@@ -590,8 +905,9 @@ async function createSection(sectionName) {
 
   await saveSectionsToJsonFile();
   renderSections();
-  renderPasswords();
+  renderCurrentView();
   populateAddPasswordSectionSelect();
+  populateAddLinkSectionSelect();
   return true;
 }
 
@@ -627,6 +943,42 @@ async function createPassword(passwordData) {
   passwords.push(newPassword);
   renderPasswords();
   await savePasswordsToJsonFile();
+  return true;
+}
+
+async function createLink(linkData) {
+  if (!historyLoaded) {
+    alert("Primero carga el historial.");
+    return false;
+  }
+
+  const sectionId = getPasswordSectionId(linkData.sectionId);
+
+  if (!sectionId) {
+    alert("Selecciona una seccion para guardar el link.");
+    return false;
+  }
+
+  const url = normalizeUrl(linkData.url);
+
+  if (!url) {
+    alert("Ingresa un link valido.");
+    return false;
+  }
+
+  const newLink = {
+    id: generateId(),
+    name: linkData.name,
+    url,
+    sectionId,
+    note: "",
+    createdAt: nowText(),
+    updatedAt: nowText()
+  };
+
+  links.push(newLink);
+  renderCurrentView();
+  await saveLinksToJsonFile();
   return true;
 }
 
@@ -676,6 +1028,23 @@ async function savePasswordNote(id, note) {
   return true;
 }
 
+async function saveLinkNote(id, note) {
+  if (!historyLoaded) {
+    alert("Primero carga el historial.");
+    return false;
+  }
+
+  const item = links.find(link => link.id === id);
+  if (!item) return false;
+
+  item.note = note.trim();
+  item.updatedAt = nowText();
+
+  await saveLinksToJsonFile();
+  alert("Nota guardada.");
+  return true;
+}
+
 async function deletePassword(id) {
   if (!historyLoaded) {
     alert("Primero carga el historial.");
@@ -685,6 +1054,17 @@ async function deletePassword(id) {
   passwords = passwords.filter(item => item.id !== id);
   renderPasswords();
   await savePasswordsToJsonFile();
+}
+
+async function deleteLink(id) {
+  if (!historyLoaded) {
+    alert("Primero carga el historial.");
+    return;
+  }
+
+  links = links.filter(item => item.id !== id);
+  renderLinks();
+  await saveLinksToJsonFile();
 }
 
 /* =========================
@@ -785,9 +1165,23 @@ function openDelete(id) {
   document.getElementById("deleteModal").classList.add("show");
 }
 
+function openDeleteLink(id) {
+  if (!historyLoaded) {
+    alert("Primero carga el historial.");
+    return;
+  }
+
+  selectedPasswordId = id;
+  document.getElementById("deleteModal").classList.add("show");
+}
+
+function copyText(text, message) {
+  navigator.clipboard.writeText(text);
+  alert(message);
+}
+
 function copyPassword(password) {
-  navigator.clipboard.writeText(password);
-  alert("Contraseña copiada.");
+  copyText(password, "Contraseña copiada.");
 }
 
 function searchPasswords(query) {
@@ -804,20 +1198,46 @@ function searchPasswords(query) {
   renderPasswords(filtered);
 }
 
+function searchLinks(query) {
+  if (!historyLoaded) return;
+
+  const text = query.toLowerCase();
+
+  const filtered = getVisibleLinks().filter(item =>
+    item.name.toLowerCase().includes(text) ||
+    item.url.toLowerCase().includes(text)
+  );
+
+  renderLinks(filtered);
+}
+
+function searchCurrentView(query) {
+  if (selectedView === "links") {
+    searchLinks(query);
+    return;
+  }
+
+  searchPasswords(query);
+}
+
 /* =========================
    Init
 ========================= */
 document.addEventListener("DOMContentLoaded", () => {
+  document.body.dataset.activeView = selectedView;
   loadSectionsFromLocalStorage();
   renderSections();
   populateAddPasswordSectionSelect();
+  populateAddLinkSectionSelect();
 
   const toolbar = document.querySelector(".toolbar");
 
   const loadButton = document.createElement("button");
   loadButton.type = "button";
   loadButton.className = "btn btn-primary mt-3";
-  loadButton.textContent = "📂 Cargar historial";
+  loadButton.title = "Cargar historial";
+  loadButton.setAttribute("aria-label", "Cargar historial");
+  loadButton.innerHTML = '<i class="bi bi-folder2-open"></i>';
 
   toolbar.appendChild(loadButton);
 
@@ -829,9 +1249,10 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    renderPasswords();
+    renderCurrentView();
     renderSections();
     populateAddPasswordSectionSelect();
+    populateAddLinkSectionSelect();
 
     if (loadButton && loadButton.parentNode) {
       loadButton.remove();
@@ -849,9 +1270,10 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    renderPasswords();
+    renderCurrentView();
     renderSections();
     populateAddPasswordSectionSelect();
+    populateAddLinkSectionSelect();
 
     if (loadButton && loadButton.parentNode) {
       loadButton.remove();
@@ -864,9 +1286,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (searchInput) {
     searchInput.addEventListener("input", event => {
-      searchPasswords(event.target.value);
+      searchCurrentView(event.target.value);
     });
   }
+
+  document.querySelectorAll(".vault-tab").forEach(button => {
+    button.addEventListener("click", () => {
+      setActiveView(button.dataset.view);
+
+      if (searchInput) {
+        searchInput.value = "";
+      }
+    });
+  });
 
   const addSectionForm = document.getElementById("addSectionForm");
   const sectionNameInput = document.getElementById("sectionNameInput");
@@ -892,7 +1324,60 @@ document.addEventListener("DOMContentLoaded", () => {
   const openAddPasswordButton = document.getElementById("openAddPasswordModal");
 
   if (openAddPasswordButton) {
-    openAddPasswordButton.addEventListener("click", populateAddPasswordSectionSelect);
+    openAddPasswordButton.addEventListener("click", () => {
+      if (selectedView === "links") {
+        populateAddLinkSectionSelect();
+        document.getElementById("addLinkModal").classList.add("show");
+        return;
+      }
+
+      populateAddPasswordSectionSelect();
+    });
+  }
+
+  const addLinkModal = document.getElementById("addLinkModal");
+  const closeAddLinkModal = document.getElementById("closeAddLinkModal");
+  const cancelAddLink = document.getElementById("cancelAddLink");
+  const addLinkForm = document.querySelector("#addLinkModal .modal-form");
+  const addLinkSection = document.getElementById("addLinkSection");
+
+  if (closeAddLinkModal) {
+    closeAddLinkModal.addEventListener("click", () => {
+      addLinkModal.classList.remove("show");
+    });
+  }
+
+  if (cancelAddLink) {
+    cancelAddLink.addEventListener("click", () => {
+      addLinkModal.classList.remove("show");
+    });
+  }
+
+  if (addLinkModal) {
+    addLinkModal.addEventListener("click", event => {
+      if (event.target === addLinkModal) {
+        addLinkModal.classList.remove("show");
+      }
+    });
+  }
+
+  if (addLinkForm) {
+    addLinkForm.addEventListener("submit", async event => {
+      event.preventDefault();
+
+      const inputs = addLinkForm.querySelectorAll("input");
+
+      const saved = await createLink({
+        sectionId: addLinkSection ? addLinkSection.value : "",
+        name: inputs[0].value.trim(),
+        url: inputs[1].value.trim()
+      });
+
+      if (!saved) return;
+
+      addLinkForm.reset();
+      addLinkModal.classList.remove("show");
+    });
   }
 
   if (addForm) {
@@ -943,7 +1428,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (confirmDeleteBtn) {
     confirmDeleteBtn.addEventListener("click", async () => {
-      await deletePassword(selectedPasswordId);
+      if (selectedView === "links") {
+        await deleteLink(selectedPasswordId);
+      } else {
+        await deletePassword(selectedPasswordId);
+      }
+
       document.getElementById("deleteModal").classList.remove("show");
     });
   }
