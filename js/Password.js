@@ -1,9 +1,14 @@
 let passwords = [];
 let links = [];
+let pendingTasks = [];
 let sections = [];
 let selectedSectionId = "";
+let selectedSectionActionId = null;
+let pendingSectionName = "";
+let pendingInactiveSectionId = null;
 let selectedPasswordId = null;
 let selectedLinkId = null;
+let selectedPendingId = null;
 let selectedView = "passwords";
 let historyLoaded = false;
 
@@ -11,10 +16,12 @@ let directoryHandle = null;
 let passwordFileHandle = null;
 let sectionFileHandle = null;
 let linkFileHandle = null;
+let pendingFileHandle = null;
 
 const JSON_FILE_NAME = "passwords-history.json";
 const SECTIONS_JSON_FILE_NAME = "sections-history.json";
 const LINKS_JSON_FILE_NAME = "links-history.json";
+const PENDING_JSON_FILE_NAME = "pending-history.json";
 const SECTIONS_STORAGE_KEY = "password-manager-sections";
 
 /* =========================
@@ -100,8 +107,15 @@ function normalizeSection(section) {
   return {
     id: section.id || generateId(),
     name: section.name || "",
-    createdAt: section.createdAt || nowText()
+    createdAt: section.createdAt || nowText(),
+    updatedAt: section.updatedAt || section.createdAt || nowText(),
+    active: section.active ?? !section.deletedAt,
+    deletedAt: section.deletedAt || ""
   };
+}
+
+function getActiveSections() {
+  return sections.filter(section => section.active !== false);
 }
 
 function loadSectionsFromLocalStorage() {
@@ -132,25 +146,53 @@ function saveSectionsToLocalStorage() {
 
 function getSectionName(sectionId) {
   const section = sections.find(item => item.id === sectionId);
-  return section ? section.name : "Sin seccion";
+  if (!section) return "Sin seccion";
+  return section.active === false ? `${section.name} (inactiva)` : section.name;
 }
 
 function getVisiblePasswords() {
+  const activePasswords = passwords.filter(item => item.active !== false);
+
   return selectedSectionId
-    ? passwords.filter(item => item.sectionId === selectedSectionId)
-    : passwords;
+    ? activePasswords.filter(item => item.sectionId === selectedSectionId)
+    : activePasswords;
 }
 
 function getVisibleLinks() {
+  const activeLinks = links.filter(item => item.active !== false);
+
   return selectedSectionId
-    ? links.filter(item => item.sectionId === selectedSectionId)
-    : links;
+    ? activeLinks.filter(item => item.sectionId === selectedSectionId)
+    : activeLinks;
+}
+
+function getVisiblePendingTasks() {
+  return pendingTasks;
 }
 
 function keepValidSelectedSection() {
-  if (selectedSectionId && !sections.some(section => section.id === selectedSectionId)) {
+  if (selectedSectionId && !getActiveSections().some(section => section.id === selectedSectionId)) {
     selectedSectionId = "";
   }
+}
+
+function normalizeSectionName(name) {
+  return name.trim().toLowerCase();
+}
+
+function findInactiveSectionByName(name) {
+  const normalizedName = normalizeSectionName(name);
+
+  return sections.find(section =>
+    section.active === false &&
+    normalizeSectionName(section.name) === normalizedName
+  );
+}
+
+function getSectionHistory(sectionId) {
+  return passwords
+    .filter(item => item.sectionId === sectionId)
+    .map((item, index) => `Plataforma ${index + 1}: ${item.platform || "Sin plataforma"}`);
 }
 
 /* =========================
@@ -195,6 +237,10 @@ async function ensureJsonFile(autoMode = false) {
     });
 
     linkFileHandle = await directoryHandle.getFileHandle(LINKS_JSON_FILE_NAME, {
+      create: true
+    });
+
+    pendingFileHandle = await directoryHandle.getFileHandle(PENDING_JSON_FILE_NAME, {
       create: true
     });
 
@@ -262,7 +308,10 @@ async function saveSectionsToJsonFile() {
   const data = sections.map(section => ({
     id: section.id,
     name: section.name,
-    createdAt: section.createdAt
+    createdAt: section.createdAt,
+    updatedAt: section.updatedAt,
+    active: section.active ?? true,
+    deletedAt: section.deletedAt || ""
   }));
 
   const writable = await sectionFileHandle.createWritable();
@@ -308,11 +357,14 @@ async function loadPasswordsFromJsonFile(autoMode = false) {
   passwords = data.map(item => ({
     id: item.id || generateId(),
     platform: item.platform || "",
+    platformUrl: item.platformUrl || item.pageLink || "",
     username: item.username || item.usuario || "",
     email: item.email || item.correo || "",
     password: item.password || item.contraseña || "",
     sectionId: item.sectionId || "",
     note: item.note || item.notes || "",
+    active: item.active ?? !item.deletedAt,
+    deletedAt: item.deletedAt || "",
     createdAt: item.createdAt || nowText(),
     updatedAt: item.updatedAt || nowText()
   }));
@@ -322,6 +374,9 @@ async function loadPasswordsFromJsonFile(autoMode = false) {
 
   const loadedLinks = await loadLinksFromJsonFile(autoMode);
   if (!loadedLinks) return false;
+
+  const loadedPendingTasks = await loadPendingTasksFromJsonFile(autoMode);
+  if (!loadedPendingTasks) return false;
 
   historyLoaded = true;
   return true;
@@ -339,11 +394,14 @@ async function savePasswordsToJsonFile() {
   const data = passwords.map(item => ({
     id: item.id,
     platform: item.platform,
+    platformUrl: item.platformUrl || "",
     username: item.username,
     email: item.email,
     password: item.password,
     sectionId: item.sectionId || "",
     note: item.note || "",
+    active: item.active ?? true,
+    deletedAt: item.deletedAt || "",
     createdAt: item.createdAt,
     updatedAt: item.updatedAt
   }));
@@ -393,6 +451,8 @@ async function loadLinksFromJsonFile(autoMode = false) {
     url: item.url || item.link || "",
     sectionId: item.sectionId || "",
     note: item.note || item.notes || "",
+    active: item.active ?? !item.deletedAt,
+    deletedAt: item.deletedAt || "",
     createdAt: item.createdAt || nowText(),
     updatedAt: item.updatedAt || nowText()
   }));
@@ -415,11 +475,86 @@ async function saveLinksToJsonFile() {
     url: item.url,
     sectionId: item.sectionId || "",
     note: item.note || "",
+    active: item.active ?? true,
+    deletedAt: item.deletedAt || "",
     createdAt: item.createdAt,
     updatedAt: item.updatedAt
   }));
 
   const writable = await linkFileHandle.createWritable();
+  await writable.write(JSON.stringify(data, null, 2));
+  await writable.close();
+}
+
+async function loadPendingTasksFromJsonFile(autoMode = false) {
+  const hasFile = await ensureJsonFile(autoMode);
+  if (!hasFile) return false;
+
+  const file = await pendingFileHandle.getFile();
+  const text = await file.text();
+
+  if (!text.trim()) {
+    pendingTasks = [];
+    return true;
+  }
+
+  let data;
+
+  try {
+    data = JSON.parse(text);
+  } catch (error) {
+    console.error("JSON de pendientes invalido:", error);
+
+    if (!autoMode) {
+      alert("El archivo pending-history.json tiene formato invalido.");
+    }
+
+    return false;
+  }
+
+  if (!Array.isArray(data)) {
+    if (!autoMode) {
+      alert("El historial de pendientes debe ser un arreglo JSON.");
+    }
+
+    return false;
+  }
+
+  pendingTasks = data.map(item => ({
+    id: item.id || generateId(),
+    title: item.title || "",
+    company: item.company || item.compania || "",
+    description: item.description || item.descripcion || "",
+    dueDate: item.dueDate || item.fechaLimite || "",
+    color: ["green", "yellow", "red"].includes(item.color) ? item.color : "green",
+    createdAt: item.createdAt || nowText(),
+    updatedAt: item.updatedAt || nowText()
+  }));
+
+  return true;
+}
+
+async function savePendingTasksToJsonFile() {
+  if (!historyLoaded) {
+    alert("Primero carga el historial antes de guardar cambios.");
+    return;
+  }
+
+  const hasFile = await ensureJsonFile(false);
+  if (!hasFile) return;
+
+  const data = pendingTasks.map(item => ({
+    id: item.id,
+    title: item.title,
+    company: item.company,
+    description: item.description,
+    dueDate: item.dueDate,
+    color: item.color,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt
+  }));
+
+  const writable = await pendingFileHandle.createWritable();
   await writable.write(JSON.stringify(data, null, 2));
   await writable.close();
 }
@@ -463,11 +598,36 @@ function renderPasswords(list = getVisiblePasswords()) {
           <h4>${escapeHtml(item.platform)}</h4>
           <p>${escapeHtml(item.username)}</p>
           <p class="card-copy-row">
+            <span>
+              Link:
+              ${
+                item.platformUrl
+                  ? `<a class="card-link-anchor" href="${escapeHtml(normalizeUrl(item.platformUrl))}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.platformUrl)}</a>`
+                  : "Sin link"
+              }
+            </span>
+            ${
+              item.platformUrl
+                ? `<button
+                    class="inline-copy-btn"
+                    type="button"
+                    data-copy-value="${escapeHtml(item.platformUrl)}"
+                    data-copy-message="Link copiado."
+                    title="Copiar link"
+                    aria-label="Copiar link"
+                  >
+                    <i class="bi bi-clipboard"></i>
+                  </button>`
+                : ""
+            }
+          </p>
+          <p class="card-copy-row">
             <span>Email: ${escapeHtml(item.email)}</span>
             <button
               class="inline-copy-btn"
               type="button"
               data-copy-value="${escapeHtml(item.email)}"
+              data-copy-message="Email copiado."
               title="Copiar email"
               aria-label="Copiar email"
             >
@@ -480,6 +640,7 @@ function renderPasswords(list = getVisiblePasswords()) {
               class="inline-copy-btn"
               type="button"
               data-copy-value="${escapeHtml(item.password)}"
+              data-copy-message="Contraseña copiada."
               title="Copiar contraseña"
               aria-label="Copiar contraseña"
             >
@@ -559,15 +720,15 @@ function renderPasswords(list = getVisiblePasswords()) {
     article.querySelectorAll(".inline-copy-btn").forEach(button => {
       button.addEventListener("click", () => {
         if (button.dataset.copyValue) {
-          copyPassword(button.dataset.copyValue);
+          copyText(button.dataset.copyValue, button.dataset.copyMessage);
         }
       });
     });
 
     article.querySelector(".share-password-btn").addEventListener("click", () => {
       copyText(
-        `Email: ${item.email}\nContraseña: ${item.password}`,
-        "Email y contraseña copiados."
+        `Plataforma: ${item.platform}\nUsuario: ${item.username}\nCorreo: ${item.email}\nContraseña: ${item.password}`,
+        "Credenciales copiadas."
       );
     });
 
@@ -657,7 +818,10 @@ function renderLinks(list = getVisibleLinks()) {
         <div>
           <h4>${escapeHtml(item.name)}</h4>
           <p class="card-copy-row">
-            <span>Link: ${escapeHtml(item.url)}</span>
+            <span>
+              Link:
+              <a class="card-link-anchor" href="${escapeHtml(normalizeUrl(item.url))}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.url)}</a>
+            </span>
             <button
               class="inline-copy-btn"
               type="button"
@@ -775,7 +939,108 @@ function renderLinks(list = getVisibleLinks()) {
   });
 }
 
+function getPendingColorLabel(color) {
+  const labels = {
+    green: "Verde",
+    yellow: "Amarillo",
+    red: "Rojo"
+  };
+
+  return labels[color] || "Verde";
+}
+
+function updatePendingCounter() {
+  const pendingCounter = document.getElementById("pendingCounter");
+  if (!pendingCounter) return;
+
+  pendingCounter.textContent = String(pendingTasks.length);
+}
+
+function renderPendingTasks(list = getVisiblePendingTasks()) {
+  const passwordList = document.querySelector(".password-list");
+  if (!passwordList) return;
+
+  updatePendingCounter();
+  passwordList.innerHTML = "";
+
+  if (list.length === 0) {
+    passwordList.innerHTML = `
+      <article class="password-card pending-card pending-card-green">
+        <div class="password-info">
+          <div class="platform-icon"><i class="bi bi-list-check"></i></div>
+          <div>
+            <h4>No hay pendientes</h4>
+            <p>Agrega tu primer pendiente</p>
+            <span>Usa el boton superior para registrarlo</span>
+          </div>
+        </div>
+      </article>
+    `;
+    return;
+  }
+
+  list.forEach(item => {
+    const article = document.createElement("article");
+    article.className = `password-card pending-card pending-card-${item.color}`;
+
+    article.innerHTML = `
+      <div class="password-info">
+        <div class="platform-icon">
+          ${escapeHtml((item.title || "?").charAt(0).toUpperCase())}
+        </div>
+
+        <div>
+          <h4>${escapeHtml(item.title)}</h4>
+          <p>Compañia: ${escapeHtml(item.company)}</p>
+          <p>Fecha limite: ${escapeHtml(item.dueDate || "Sin fecha")}</p>
+          <span class="pending-color-label">Semaforo: ${escapeHtml(getPendingColorLabel(item.color))}</span>
+        </div>
+      </div>
+
+      <div class="pending-card-description">
+        <h5>Descripcion</h5>
+        <p>${escapeHtml(item.description || "Sin descripcion")}</p>
+      </div>
+
+      <div class="card-actions">
+        <button class="btn details-btn" type="button" title="Detalles" aria-label="Detalles">
+          <i class="bi bi-eye"></i>
+        </button>
+
+        <button class="btn update-btn" type="button" title="Actualizar" aria-label="Actualizar">
+          <i class="bi bi-pencil-square"></i>
+        </button>
+
+        <button class="btn delete-btn" type="button" title="Eliminar" aria-label="Eliminar">
+          <i class="bi bi-trash"></i>
+        </button>
+      </div>
+    `;
+
+    article.querySelector(".details-btn").addEventListener("click", () => {
+      openPendingModal("view", item.id);
+    });
+
+    article.querySelector(".update-btn").addEventListener("click", () => {
+      openPendingModal("edit", item.id);
+    });
+
+    article.querySelector(".delete-btn").addEventListener("click", () => {
+      deletePendingTask(item.id);
+    });
+
+    passwordList.appendChild(article);
+  });
+}
+
 function renderCurrentView() {
+  updatePendingCounter();
+
+  if (selectedView === "pending") {
+    renderPendingTasks();
+    return;
+  }
+
   if (selectedView === "links") {
     renderLinks();
     return;
@@ -792,7 +1057,7 @@ function renderSections() {
 
   const allButton = document.createElement("button");
   allButton.type = "button";
-  allButton.className = `sidebar-section-item${selectedSectionId ? "" : " active"}`;
+  allButton.className = `sidebar-section-item${!selectedSectionId && selectedView !== "pending" ? " active" : ""}`;
   allButton.innerHTML = `
     <span class="sidebar-section-icon">#</span>
     <span>Todas</span>
@@ -801,14 +1066,20 @@ function renderSections() {
   allButton.addEventListener("click", () => {
     selectedSectionId = "";
     renderSections();
-    renderCurrentView();
+    if (selectedView === "pending") {
+      setActiveView("passwords");
+    } else {
+      renderCurrentView();
+    }
     populateAddPasswordSectionSelect();
     populateAddLinkSectionSelect();
   });
 
   sectionList.appendChild(allButton);
 
-  if (sections.length === 0) {
+  const activeSections = getActiveSections();
+
+  if (activeSections.length === 0) {
     const emptyMessage = document.createElement("p");
     emptyMessage.className = "sidebar-empty-sections";
     emptyMessage.textContent = "Sin secciones";
@@ -816,11 +1087,14 @@ function renderSections() {
     return;
   }
 
-  sections.forEach(section => {
+  activeSections.forEach(section => {
+    const sectionRow = document.createElement("div");
+    sectionRow.className = "sidebar-section-row";
+    sectionRow.dataset.id = section.id;
+
     const button = document.createElement("button");
     button.type = "button";
-    button.className = `sidebar-section-item${section.id === selectedSectionId ? " active" : ""}`;
-    button.dataset.id = section.id;
+    button.className = `sidebar-section-item${section.id === selectedSectionId && selectedView !== "pending" ? " active" : ""}`;
 
     button.innerHTML = `
       <span class="sidebar-section-icon">
@@ -832,12 +1106,38 @@ function renderSections() {
     button.addEventListener("click", () => {
       selectedSectionId = section.id;
       renderSections();
-      renderCurrentView();
+      if (selectedView === "pending") {
+        setActiveView("passwords");
+      } else {
+        renderCurrentView();
+      }
       populateAddPasswordSectionSelect();
       populateAddLinkSectionSelect();
     });
 
-    sectionList.appendChild(button);
+    const actionGroup = document.createElement("div");
+    actionGroup.className = "sidebar-section-actions";
+    actionGroup.innerHTML = `
+      <button class="sidebar-section-action edit-section-btn" type="button" title="Editar seccion" aria-label="Editar seccion">
+        <i class="bi bi-pencil"></i>
+      </button>
+
+      <button class="sidebar-section-action delete-section-btn" type="button" title="Eliminar seccion" aria-label="Eliminar seccion">
+        <i class="bi bi-trash"></i>
+      </button>
+    `;
+
+    actionGroup.querySelector(".edit-section-btn").addEventListener("click", () => {
+      openEditSection(section.id);
+    });
+
+    actionGroup.querySelector(".delete-section-btn").addEventListener("click", () => {
+      openDeleteSection(section.id);
+    });
+
+    sectionRow.appendChild(button);
+    sectionRow.appendChild(actionGroup);
+    sectionList.appendChild(sectionRow);
   });
 }
 
@@ -846,7 +1146,7 @@ function populateSectionSelect(selectElement, selectedId = "") {
 
   selectElement.innerHTML = '<option value="">Selecciona una seccion</option>';
 
-  sections.forEach(section => {
+  getActiveSections().forEach(section => {
     const option = document.createElement("option");
     option.value = section.id;
     option.textContent = section.name;
@@ -874,9 +1174,11 @@ function setActiveView(view) {
   document.body.dataset.activeView = selectedView;
 
   const isLinksView = selectedView === "links";
+  const isPendingView = selectedView === "pending";
   const heroTitle = document.querySelector(".hero-section h1");
   const heroDescription = document.getElementById("heroDescription");
   const addButton = document.getElementById("openAddPasswordModal");
+  const pendingAccessButton = document.getElementById("pendingAccessBtn");
 
   document.querySelectorAll(".vault-tab").forEach(button => {
     const isActive = button.dataset.view === selectedView;
@@ -884,29 +1186,48 @@ function setActiveView(view) {
     button.setAttribute("aria-selected", String(isActive));
   });
 
+  if (pendingAccessButton) {
+    pendingAccessButton.classList.toggle("active", isPendingView);
+  }
+
   if (heroTitle) {
-    heroTitle.textContent = isLinksView
-      ? "Administrador de Links"
-      : "Administrador de Contraseñas";
+    heroTitle.textContent = isPendingView
+      ? "Administrador de Pendientes"
+      : isLinksView
+        ? "Administrador de Links"
+        : "Administrador de Contraseñas";
   }
 
   if (heroDescription) {
-    heroDescription.textContent = isLinksView
-      ? "Guarda accesos rapidos a paginas y empresas"
-      : "Administra tus contraseñas de forma rápida";
+    heroDescription.textContent = isPendingView
+      ? "Organiza tareas por prioridad de semaforo"
+      : isLinksView
+        ? "Guarda accesos rapidos a paginas y empresas"
+        : "Administra tus contraseñas de forma rápida";
   }
 
   if (addButton) {
-    addButton.title = isLinksView ? "Agregar link" : "Agregar contraseña";
+    addButton.title = isPendingView
+      ? "Agregar pendiente"
+      : isLinksView
+        ? "Agregar link"
+        : "Agregar contraseña";
     addButton.setAttribute(
       "aria-label",
-      isLinksView ? "Agregar link" : "Agregar contraseña"
+      isPendingView
+        ? "Agregar pendiente"
+        : isLinksView
+          ? "Agregar link"
+          : "Agregar contraseña"
     );
-    addButton.innerHTML = isLinksView
-      ? '<i class="bi bi-link-45deg"></i>'
-      : '<i class="bi bi-key-fill"></i>';
+    addButton.innerHTML = isPendingView
+      ? '<i class="bi bi-list-check"></i>'
+      : isLinksView
+        ? '<i class="bi bi-link-45deg"></i>'
+        : '<i class="bi bi-key-fill"></i>';
   }
 
+  renderSections();
   renderCurrentView();
 }
 
@@ -921,10 +1242,26 @@ async function createSection(sectionName) {
     return false;
   }
 
+  const inactiveSection = findInactiveSectionByName(name);
+
+  if (inactiveSection) {
+    openRestoreSectionPrompt(inactiveSection.id, name);
+    return false;
+  }
+
+  return createNewSection(name);
+}
+
+async function createNewSection(name) {
+  const normalizedName = name.trim();
+
   const newSection = {
     id: generateId(),
-    name,
-    createdAt: nowText()
+    name: normalizedName,
+    createdAt: nowText(),
+    updatedAt: nowText(),
+    active: true,
+    deletedAt: ""
   };
 
   sections.push(newSection);
@@ -938,8 +1275,146 @@ async function createSection(sectionName) {
   return true;
 }
 
+function openRestoreSectionPrompt(sectionId, sectionName) {
+  pendingSectionName = sectionName;
+  pendingInactiveSectionId = sectionId;
+
+  const modal = document.getElementById("restoreSectionModal");
+  const message = document.getElementById("restoreSectionMessage");
+  const historyList = document.getElementById("restoreSectionHistoryList");
+  const history = getSectionHistory(sectionId);
+
+  message.textContent = `Ya existe una seccion inactiva llamada "${sectionName}". ¿Deseas restaurarla o sobrescribirla con una seccion nueva?`;
+  historyList.innerHTML = "";
+
+  if (history.length === 0) {
+    const item = document.createElement("li");
+    item.textContent = "No hay plataformas registradas.";
+    historyList.appendChild(item);
+  } else {
+    history.forEach(historyItem => {
+      const item = document.createElement("li");
+      item.textContent = historyItem;
+      historyList.appendChild(item);
+    });
+  }
+
+  modal.classList.add("show");
+}
+
+async function restoreInactiveSection(id) {
+  const restoredAt = nowText();
+  const section = sections.find(item => item.id === id && item.active === false);
+  if (!section) return false;
+
+  section.active = true;
+  section.deletedAt = "";
+  section.updatedAt = restoredAt;
+
+  passwords = passwords.map(item =>
+    item.sectionId === id
+      ? {
+          ...item,
+          active: true,
+          deletedAt: "",
+          updatedAt: restoredAt
+        }
+      : item
+  );
+
+  links = links.map(item =>
+    item.sectionId === id
+      ? {
+          ...item,
+          active: true,
+          deletedAt: "",
+          updatedAt: restoredAt
+        }
+      : item
+  );
+
+  selectedSectionId = id;
+
+  await saveSectionsToJsonFile();
+  await savePasswordsToJsonFile();
+  await saveLinksToJsonFile();
+  renderSections();
+  renderCurrentView();
+  populateAddPasswordSectionSelect();
+  populateAddLinkSectionSelect();
+  return true;
+}
+
+async function updateSection(id, sectionName) {
+  const name = sectionName.trim();
+
+  if (!name) {
+    alert("Ingresa el nombre de la seccion.");
+    return false;
+  }
+
+  const section = sections.find(item => item.id === id && item.active !== false);
+  if (!section) return false;
+
+  section.name = name;
+  section.updatedAt = nowText();
+
+  await saveSectionsToJsonFile();
+  renderSections();
+  renderCurrentView();
+  populateAddPasswordSectionSelect();
+  populateAddLinkSectionSelect();
+  return true;
+}
+
+async function softDeleteSection(id) {
+  const section = sections.find(item => item.id === id && item.active !== false);
+  if (!section) return false;
+
+  const deletedAt = nowText();
+
+  section.active = false;
+  section.deletedAt = deletedAt;
+  section.updatedAt = deletedAt;
+
+  passwords = passwords.map(item =>
+    item.sectionId === id
+      ? {
+          ...item,
+          active: false,
+          deletedAt,
+          updatedAt: deletedAt
+        }
+      : item
+  );
+
+  links = links.map(item =>
+    item.sectionId === id
+      ? {
+          ...item,
+          active: false,
+          deletedAt,
+          updatedAt: deletedAt
+        }
+      : item
+  );
+
+  if (selectedSectionId === id) {
+    selectedSectionId = "";
+  }
+
+  await saveSectionsToJsonFile();
+  await savePasswordsToJsonFile();
+  await saveLinksToJsonFile();
+  renderSections();
+  renderCurrentView();
+  populateAddPasswordSectionSelect();
+  populateAddLinkSectionSelect();
+  return true;
+}
+
 function getPasswordSectionId(sectionId) {
-  return sections.some(section => section.id === sectionId) ? sectionId : "";
+  return getActiveSections().some(section => section.id === sectionId) ? sectionId : "";
 }
 
 async function createPassword(passwordData) {
@@ -958,11 +1433,14 @@ async function createPassword(passwordData) {
   const newPassword = {
     id: generateId(),
     platform: passwordData.platform,
+    platformUrl: normalizeUrl(passwordData.platformUrl || ""),
     username: passwordData.username,
     email: passwordData.email,
     password: passwordData.password,
     sectionId,
     note: "",
+    active: true,
+    deletedAt: "",
     createdAt: nowText(),
     updatedAt: nowText()
   };
@@ -999,6 +1477,8 @@ async function createLink(linkData) {
     url,
     sectionId,
     note: "",
+    active: true,
+    deletedAt: "",
     createdAt: nowText(),
     updatedAt: nowText()
   };
@@ -1046,6 +1526,50 @@ async function updateLink(id, updatedData) {
   return true;
 }
 
+async function createPendingTask(pendingData) {
+  if (!historyLoaded) {
+    alert("Primero carga el historial.");
+    return false;
+  }
+
+  const newPendingTask = {
+    id: generateId(),
+    title: pendingData.title,
+    company: pendingData.company,
+    description: pendingData.description,
+    dueDate: pendingData.dueDate,
+    color: pendingData.color,
+    createdAt: nowText(),
+    updatedAt: nowText()
+  };
+
+  pendingTasks.push(newPendingTask);
+  renderPendingTasks();
+  await savePendingTasksToJsonFile();
+  return true;
+}
+
+async function updatePendingTask(id, updatedData) {
+  if (!historyLoaded) {
+    alert("Primero carga el historial.");
+    return false;
+  }
+
+  pendingTasks = pendingTasks.map(item =>
+    item.id === id
+      ? {
+          ...item,
+          ...updatedData,
+          updatedAt: nowText()
+        }
+      : item
+  );
+
+  renderPendingTasks();
+  await savePendingTasksToJsonFile();
+  return true;
+}
+
 async function updatePassword(id, updatedData) {
   if (!historyLoaded) {
     alert("Primero carga el historial.");
@@ -1064,6 +1588,7 @@ async function updatePassword(id, updatedData) {
       ? {
           ...item,
           ...updatedData,
+          platformUrl: normalizeUrl(updatedData.platformUrl || ""),
           sectionId,
           updatedAt: nowText()
         }
@@ -1131,6 +1656,17 @@ async function deleteLink(id) {
   await saveLinksToJsonFile();
 }
 
+async function deletePendingTask(id) {
+  if (!historyLoaded) {
+    alert("Primero carga el historial.");
+    return;
+  }
+
+  pendingTasks = pendingTasks.filter(item => item.id !== id);
+  renderPendingTasks();
+  await savePendingTasksToJsonFile();
+}
+
 /* =========================
    Modales
 ========================= */
@@ -1158,8 +1694,12 @@ function setDetailsModalMode(mode) {
     sectionSelect.disabled = isViewMode;
   }
 
-  inputs.forEach((input, index) => {
-    input.readOnly = isViewMode || index === 3 || index === 4;
+  inputs.forEach(input => {
+    input.readOnly = isViewMode;
+  });
+
+  detailsModal.querySelectorAll(".details-date-group input").forEach(input => {
+    input.readOnly = true;
   });
 
   dateGroups.forEach(group => {
@@ -1202,11 +1742,12 @@ function openPasswordModal(id, mode) {
   setDetailsModalMode(mode);
 
   inputs[0].value = item.platform;
-  inputs[1].value = item.username;
-  inputs[2].value = item.email;
-  inputs[3].value = item.createdAt;
-  inputs[4].value = item.updatedAt;
-  inputs[5].value = item.password;
+  inputs[1].value = item.platformUrl || "";
+  inputs[2].value = item.username;
+  inputs[3].value = item.email;
+  inputs[4].value = item.createdAt;
+  inputs[5].value = item.updatedAt;
+  inputs[6].value = item.password;
 
   detailsModal.classList.add("show");
 }
@@ -1217,6 +1758,28 @@ function openDetails(id) {
 
 function openUpdate(id) {
   openPasswordModal(id, "edit");
+}
+
+function openEditSection(id) {
+  const section = sections.find(item => item.id === id && item.active !== false);
+  if (!section) return;
+
+  selectedSectionActionId = id;
+
+  const editSectionModal = document.getElementById("editSectionModal");
+  const editSectionNameInput = document.getElementById("editSectionNameInput");
+
+  editSectionNameInput.value = section.name;
+  editSectionModal.classList.add("show");
+  editSectionNameInput.focus();
+}
+
+function openDeleteSection(id) {
+  const section = sections.find(item => item.id === id && item.active !== false);
+  if (!section) return;
+
+  selectedSectionActionId = id;
+  document.getElementById("deleteSectionModal").classList.add("show");
 }
 
 function openUpdateLink(id) {
@@ -1239,6 +1802,67 @@ function openUpdateLink(id) {
   inputs[1].value = item.url;
 
   updateLinkModal.classList.add("show");
+}
+
+function setPendingModalMode(mode) {
+  const pendingModal = document.getElementById("pendingModal");
+  const title = document.getElementById("pendingModalTitle");
+  const subtitle = document.getElementById("pendingModalSubtitle");
+  const submitButton = document.getElementById("savePendingBtn");
+  const inputs = pendingModal.querySelectorAll("input, textarea, select");
+  const isViewMode = mode === "view";
+
+  title.textContent = isViewMode
+    ? "Detalles del pendiente"
+    : mode === "edit"
+      ? "Actualizar pendiente"
+      : "Agregar Pendiente";
+
+  subtitle.textContent = isViewMode
+    ? "Consulta la informacion guardada."
+    : mode === "edit"
+      ? "Edita y guarda los cambios de este pendiente."
+      : "Registra una tarea pendiente.";
+
+  inputs.forEach(input => {
+    input.disabled = isViewMode;
+  });
+
+  if (submitButton) {
+    submitButton.hidden = isViewMode;
+  }
+}
+
+function openPendingModal(mode = "create", id = null) {
+  if (!historyLoaded) {
+    alert("Primero carga el historial.");
+    return;
+  }
+
+  selectedPendingId = id;
+
+  const pendingModal = document.getElementById("pendingModal");
+  const form = pendingModal.querySelector("form");
+  const inputs = pendingModal.querySelectorAll("input, textarea, select");
+  form.reset();
+  inputs.forEach(input => {
+    input.disabled = false;
+  });
+
+  if (mode !== "create") {
+    const item = pendingTasks.find(pendingTask => pendingTask.id === id);
+    if (!item) return;
+
+    inputs[0].value = item.title;
+    inputs[1].value = item.company;
+    inputs[2].value = item.description;
+    inputs[3].value = item.dueDate;
+    inputs[4].value = item.color;
+  }
+
+  setPendingModalMode(mode);
+  pendingModal.dataset.mode = mode;
+  pendingModal.classList.add("show");
 }
 
 function openDelete(id) {
@@ -1277,6 +1901,7 @@ function searchPasswords(query) {
 
   const filtered = getVisiblePasswords().filter(item =>
     item.platform.toLowerCase().includes(text) ||
+    (item.platformUrl || "").toLowerCase().includes(text) ||
     item.username.toLowerCase().includes(text) ||
     item.email.toLowerCase().includes(text)
   );
@@ -1297,7 +1922,28 @@ function searchLinks(query) {
   renderLinks(filtered);
 }
 
+function searchPendingTasks(query) {
+  if (!historyLoaded) return;
+
+  const text = query.toLowerCase();
+
+  const filtered = getVisiblePendingTasks().filter(item =>
+    item.title.toLowerCase().includes(text) ||
+    item.company.toLowerCase().includes(text) ||
+    item.description.toLowerCase().includes(text) ||
+    item.dueDate.toLowerCase().includes(text) ||
+    getPendingColorLabel(item.color).toLowerCase().includes(text)
+  );
+
+  renderPendingTasks(filtered);
+}
+
 function searchCurrentView(query) {
+  if (selectedView === "pending") {
+    searchPendingTasks(query);
+    return;
+  }
+
   if (selectedView === "links") {
     searchLinks(query);
     return;
@@ -1306,11 +1952,20 @@ function searchCurrentView(query) {
   searchPasswords(query);
 }
 
+function closeInlineSectionForm() {
+  const toggleSectionForm = document.getElementById("toggleInlineAddSectionForm");
+
+  if (toggleSectionForm) {
+    toggleSectionForm.checked = false;
+  }
+}
+
 /* =========================
    Init
 ========================= */
 document.addEventListener("DOMContentLoaded", () => {
   document.body.dataset.activeView = selectedView;
+  updatePendingCounter();
   loadSectionsFromLocalStorage();
   renderSections();
   populateAddPasswordSectionSelect();
@@ -1386,8 +2041,33 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
+  const pendingAccessButton = document.getElementById("pendingAccessBtn");
+
+  if (pendingAccessButton) {
+    pendingAccessButton.addEventListener("click", () => {
+      setActiveView("pending");
+
+      if (searchInput) {
+        searchInput.value = "";
+      }
+    });
+  }
+
   const addSectionForm = document.getElementById("addSectionForm");
   const sectionNameInput = document.getElementById("sectionNameInput");
+  const cancelAddSection = document.getElementById("cancelAddSection");
+  const restoreSectionModal = document.getElementById("restoreSectionModal");
+  const restoreSectionBtn = document.getElementById("restoreSectionBtn");
+  const overwriteSectionBtn = document.getElementById("overwriteSectionBtn");
+  const cancelRestoreSectionBtn = document.getElementById("cancelRestoreSectionBtn");
+  const editSectionModal = document.getElementById("editSectionModal");
+  const editSectionForm = document.getElementById("editSectionForm");
+  const editSectionNameInput = document.getElementById("editSectionNameInput");
+  const closeEditSectionModal = document.getElementById("closeEditSectionModal");
+  const cancelEditSection = document.getElementById("cancelEditSection");
+  const deleteSectionModal = document.getElementById("deleteSectionModal");
+  const cancelDeleteSectionBtn = document.getElementById("cancelDeleteSectionBtn");
+  const confirmDeleteSectionBtn = document.getElementById("confirmDeleteSectionBtn");
 
   if (addSectionForm && sectionNameInput) {
     addSectionForm.addEventListener("submit", async event => {
@@ -1397,11 +2077,108 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!created) return;
 
       addSectionForm.reset();
+      closeInlineSectionForm();
+    });
+  }
 
-      const toggleSectionForm = document.getElementById("toggleInlineAddSectionForm");
-      if (toggleSectionForm) {
-        toggleSectionForm.checked = false;
+  if (cancelAddSection && addSectionForm) {
+    cancelAddSection.addEventListener("click", () => {
+      addSectionForm.reset();
+      closeInlineSectionForm();
+    });
+  }
+
+  if (restoreSectionModal) {
+    restoreSectionModal.addEventListener("click", event => {
+      if (event.target === restoreSectionModal) {
+        restoreSectionModal.classList.remove("show");
       }
+    });
+  }
+
+  if (restoreSectionBtn) {
+    restoreSectionBtn.addEventListener("click", async () => {
+      const restored = await restoreInactiveSection(pendingInactiveSectionId);
+      if (!restored) return;
+
+      addSectionForm.reset();
+      closeInlineSectionForm();
+      restoreSectionModal.classList.remove("show");
+    });
+  }
+
+  if (overwriteSectionBtn) {
+    overwriteSectionBtn.addEventListener("click", async () => {
+      const created = await createNewSection(pendingSectionName);
+      if (!created) return;
+
+      addSectionForm.reset();
+      closeInlineSectionForm();
+      restoreSectionModal.classList.remove("show");
+    });
+  }
+
+  if (cancelRestoreSectionBtn) {
+    cancelRestoreSectionBtn.addEventListener("click", () => {
+      restoreSectionModal.classList.remove("show");
+    });
+  }
+
+  if (closeEditSectionModal) {
+    closeEditSectionModal.addEventListener("click", () => {
+      editSectionModal.classList.remove("show");
+    });
+  }
+
+  if (cancelEditSection) {
+    cancelEditSection.addEventListener("click", () => {
+      editSectionModal.classList.remove("show");
+    });
+  }
+
+  if (editSectionModal) {
+    editSectionModal.addEventListener("click", event => {
+      if (event.target === editSectionModal) {
+        editSectionModal.classList.remove("show");
+      }
+    });
+  }
+
+  if (editSectionForm && editSectionNameInput) {
+    editSectionForm.addEventListener("submit", async event => {
+      event.preventDefault();
+
+      const saved = await updateSection(
+        selectedSectionActionId,
+        editSectionNameInput.value
+      );
+
+      if (!saved) return;
+
+      editSectionModal.classList.remove("show");
+    });
+  }
+
+  if (cancelDeleteSectionBtn) {
+    cancelDeleteSectionBtn.addEventListener("click", () => {
+      deleteSectionModal.classList.remove("show");
+    });
+  }
+
+  if (deleteSectionModal) {
+    deleteSectionModal.addEventListener("click", event => {
+      if (event.target === deleteSectionModal) {
+        deleteSectionModal.classList.remove("show");
+      }
+    });
+  }
+
+  if (confirmDeleteSectionBtn) {
+    confirmDeleteSectionBtn.addEventListener("click", async () => {
+      const deleted = await softDeleteSection(selectedSectionActionId);
+      if (!deleted) return;
+
+      deleteSectionModal.classList.remove("show");
     });
   }
 
@@ -1411,6 +2188,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (openAddPasswordButton) {
     openAddPasswordButton.addEventListener("click", () => {
+      if (selectedView === "pending") {
+        openPendingModal("create");
+        return;
+      }
+
       if (selectedView === "links") {
         populateAddLinkSectionSelect();
         document.getElementById("addLinkModal").classList.add("show");
@@ -1509,6 +2291,55 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  const pendingModal = document.getElementById("pendingModal");
+  const closePendingModal = document.getElementById("closePendingModal");
+  const cancelPendingModal = document.getElementById("cancelPendingModal");
+  const pendingForm = document.querySelector("#pendingModal .modal-form");
+
+  function closePendingFormModal() {
+    pendingModal.classList.remove("show");
+    pendingForm.reset();
+  }
+
+  if (closePendingModal) {
+    closePendingModal.addEventListener("click", closePendingFormModal);
+  }
+
+  if (cancelPendingModal) {
+    cancelPendingModal.addEventListener("click", closePendingFormModal);
+  }
+
+  if (pendingModal) {
+    pendingModal.addEventListener("click", event => {
+      if (event.target === pendingModal) {
+        closePendingFormModal();
+      }
+    });
+  }
+
+  if (pendingForm) {
+    pendingForm.addEventListener("submit", async event => {
+      event.preventDefault();
+
+      const inputs = pendingForm.querySelectorAll("input, textarea, select");
+      const pendingData = {
+        title: inputs[0].value.trim(),
+        company: inputs[1].value.trim(),
+        description: inputs[2].value.trim(),
+        dueDate: inputs[3].value,
+        color: inputs[4].value
+      };
+
+      const saved = pendingModal.dataset.mode === "edit"
+        ? await updatePendingTask(selectedPendingId, pendingData)
+        : await createPendingTask(pendingData);
+
+      if (!saved) return;
+
+      closePendingFormModal();
+    });
+  }
+
   if (addForm) {
     addForm.addEventListener("submit", async event => {
       event.preventDefault();
@@ -1518,9 +2349,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const saved = await createPassword({
         sectionId: addPasswordSection ? addPasswordSection.value : "",
         platform: inputs[0].value.trim(),
-        username: inputs[1].value.trim(),
-        email: inputs[2].value.trim(),
-        password: inputs[3].value
+        platformUrl: inputs[1].value.trim(),
+        username: inputs[2].value.trim(),
+        email: inputs[3].value.trim(),
+        password: inputs[4].value
       });
 
       if (!saved) return;
@@ -1542,9 +2374,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const saved = await updatePassword(selectedPasswordId, {
         sectionId: detailsPasswordSection ? detailsPasswordSection.value : "",
         platform: inputs[0].value.trim(),
-        username: inputs[1].value.trim(),
-        email: inputs[2].value.trim(),
-        password: inputs[5].value
+        platformUrl: inputs[1].value.trim(),
+        username: inputs[2].value.trim(),
+        email: inputs[3].value.trim(),
+        password: inputs[6].value
       });
 
       if (!saved) return;

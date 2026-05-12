@@ -78,9 +78,9 @@ body{
 
 .sidebar{
 
-  width:260px;
+  width:320px;
 
-  min-width:260px;
+  min-width:320px;
 
   background:var(--bg-secondary);
 
@@ -96,7 +96,7 @@ body{
 
   flex-direction:column;
 
-  justify-content:space-between;
+  justify-content:flex-start;
 }
 
 /* =========================================
@@ -236,6 +236,47 @@ body{
   border-radius:20px;
 
   border:1px solid rgba(255,255,255,0.06);
+}
+
+.sidebar-pending-btn{
+  width:100%;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  border:none;
+  border-radius:18px;
+  background:rgba(255,255,255,0.06);
+  color:white;
+  padding:14px 16px;
+  margin-top:auto;
+  margin-bottom:12px;
+  font-weight:700;
+  text-align:left;
+  transition:all 0.25s ease;
+}
+
+.pending-counter{
+  min-width:28px;
+  height:28px;
+  margin-left:auto;
+  border-radius:999px;
+  background:rgba(255,255,255,0.14);
+  color:white;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:13px;
+  font-weight:800;
+}
+
+.sidebar-pending-btn:hover,
+.sidebar-pending-btn.active{
+  background:linear-gradient(
+    135deg,
+    rgba(99,102,241,0.25),
+    rgba(139,92,246,0.20)
+  );
+  transform:translateX(4px);
 }
 
 .profile-avatar{
@@ -602,6 +643,59 @@ button .bi,
     0 16px 40px rgba(124,92,255,0.12);
 }
 
+.pending-card{
+  border:2px solid var(--pending-border);
+  box-shadow:
+    0 12px 30px var(--pending-shadow);
+}
+
+.pending-card:hover{
+  border-color:var(--pending-border);
+  box-shadow:
+    0 18px 42px var(--pending-shadow);
+}
+
+.pending-card-green{
+  --pending-border:rgba(34,197,94,0.75);
+  --pending-shadow:rgba(34,197,94,0.14);
+}
+
+.pending-card-yellow{
+  --pending-border:rgba(234,179,8,0.80);
+  --pending-shadow:rgba(234,179,8,0.14);
+}
+
+.pending-card-red{
+  --pending-border:rgba(239,68,68,0.78);
+  --pending-shadow:rgba(239,68,68,0.14);
+}
+
+.pending-card-description{
+  justify-self:center;
+  width:100%;
+  max-width:380px;
+  padding:16px;
+  border-radius:18px;
+  background:rgba(255,255,255,0.05);
+}
+
+.pending-card-description h5{
+  margin-bottom:8px;
+  font-size:14px;
+  color:#c4b5fd;
+  font-weight:800;
+}
+
+.pending-card-description p{
+  margin:0;
+  color:rgba(255,255,255,0.78);
+  line-height:1.5;
+}
+
+.pending-color-label{
+  color:rgba(255,255,255,0.58) !important;
+}
+
 /* =========================================
    PASSWORD INFO
 ========================================= */
@@ -711,6 +805,22 @@ button .bi,
   color:rgba(255,255,255,0.85);
 
   font-size:14px;
+}
+
+.card-link-anchor{
+
+  color:#c4b5fd;
+
+  text-decoration:none;
+
+  font-weight:700;
+}
+
+.card-link-anchor:hover{
+
+  color:white;
+
+  text-decoration:underline;
 }
 
 .inline-copy-btn{
@@ -1288,6 +1398,29 @@ button .bi,
   color:white;
 }
 
+.pending-color-select{
+  font-weight:800;
+}
+
+.pending-option-green{
+  color:#22c55e;
+}
+
+.pending-option-yellow{
+  color:#eab308;
+}
+
+.pending-option-red{
+  color:#ef4444;
+}
+
+.pending-description-input{
+  min-height:120px;
+  height:auto;
+  resize:vertical;
+  padding:16px 20px;
+}
+
 /* =========================================
    MODAL ACTIONS
 ========================================= */
@@ -1405,6 +1538,51 @@ button .bi,
   line-height:1.7;
 
   margin-bottom:34px;
+}
+
+.section-history-modal{
+
+  max-width:560px;
+}
+
+.section-history-box{
+
+  text-align:left;
+
+  background:rgba(255,255,255,0.05);
+
+  border:1px solid rgba(255,255,255,0.08);
+
+  border-radius:20px;
+
+  padding:18px;
+
+  margin-bottom:28px;
+}
+
+.section-history-box h4{
+
+  font-size:16px;
+
+  font-weight:800;
+
+  margin-bottom:12px;
+}
+
+.section-history-box ul{
+
+  margin:0;
+
+  padding-left:18px;
+
+  color:rgba(255,255,255,0.72);
+
+  font-size:14px;
+}
+
+.section-history-box li + li{
+
+  margin-top:8px;
 }
 
 /* =========================================
@@ -1913,6 +2091,30 @@ button .bi,
   width: fit-content;
 }
 
+.inline-add-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.cancel-section-btn {
+  height: 58px;
+  padding: 0 24px;
+  border: none;
+  border-radius: 18px;
+  background: rgba(255,255,255,0.08);
+  color: white;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cancel-section-btn:hover {
+  background: rgba(255,255,255,0.14);
+  color: white;
+}
+
 @media(max-width: 768px) {
   .inline-add-form {
     grid-template-columns: 1fr;
@@ -1920,7 +2122,14 @@ button .bi,
 
   .inline-add-form .btn {
     grid-column: span 1;
+  }
+
+  .inline-add-actions {
     width: 100%;
+  }
+
+  .inline-add-actions .btn {
+    flex: 1;
   }
 }
 
@@ -1984,7 +2193,7 @@ button .bi,
   color: white;
   font-weight: 600;
   transition: all 0.25s ease;
-  max-width: 170px;
+  max-width: 220px;
   text-align: center;
   display: flex;
   justify-content: center;
@@ -2017,6 +2226,42 @@ button .bi,
   font-weight: 600;
   text-align: left;
   transition: all 0.25s ease;
+}
+
+.sidebar-section-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.sidebar-section-row .sidebar-section-item {
+  min-width: 0;
+}
+
+.sidebar-section-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.sidebar-section-action {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.06);
+  color: #c4b5fd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.25s ease;
+}
+
+.sidebar-section-action:hover {
+  background: rgba(255,255,255,0.12);
+  color: white;
+  transform: translateY(-1px);
 }
 
 .sidebar-section-item:hover {
