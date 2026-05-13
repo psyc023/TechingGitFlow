@@ -1,0 +1,23 @@
+:root {
+    --bg-primary: #050505;        /* Negro casi absoluto */
+    --bg-secondary: #0a0a0a;      /* Negro sidebar */
+    --bg-card: #121212;           /* Cards ligeramente visibles */
+    --bg-hover: rgba(139, 0, 0, 0.1);
+    --border-color: rgba(145, 123, 100, 0.2); /* Bronce/Sepia muy sutil */
+    --text-primary: #d4d4d2;      /* Crema/Hueso de la imagen de medusas */
+    --text-secondary: #8b0000;    /* Rojo sangre oscuro */
+    --primary-color: #5c4d3c;     /* Sepia oscuro */
+    --danger-color: #4a0404;
+    --success-color: #1e2a1e;
+    --blur: blur(15px);
+}
+
+/* Gradiente gótico para el fondo */
+body {
+    background: linear-gradient(135deg, #050505, #0a0a0a, #121212) !important;
+}
+
+.logo-icon, .add-password-btn {
+    background: linear-gradient(135deg, #4a0404, #2a0202) !important; /* Botones góticos */
+    box-shadow: 0 10px 30px rgba(74, 4, 4, 0.3);
+}
