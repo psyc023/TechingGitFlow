@@ -2505,26 +2505,49 @@ function palancaDeCambios() {
   // Rotamos entre 0, 1 y 2
   contadorTemas = (contadorTemas + 1) % 3;
 
-  // Obtenemos las referencias de los links en el HTML
+  // Referencias de los links y de los textos que pierden contraste
   const linkLight = document.getElementById('theme-light');
   const linkDark = document.getElementById('theme-dark');
+
+  // Seleccionamos específicamente los elementos que se pierden
+  const palabrasClave = document.querySelectorAll(
+    '#openAddSectionForm, #pendingAccessBtn span, .sidebar-section-item span, .sidebar-section-icon, .sidebar-empty-sections, .sidebar h2, .sidebar p'
+  );
 
   if (contadorTemas === 1) {
     // MODO APPLE: Activamos el CSS claro y apagamos el oscuro
     if (linkLight) linkLight.disabled = false;
     if (linkDark) linkDark.disabled = true;
+
+    // Forzamos el color negro/gris oscuro a esos elementos específicos
+    palabrasClave.forEach(el => {
+      el.style.setProperty('color', '#1d1d1f', 'important');
+    });
+
     console.log("Tema activado: Apple (Claro)");
   } 
   else if (contadorTemas === 2) {
     // MODO GÓTICO: Activamos el CSS oscuro y apagamos el claro
     if (linkLight) linkLight.disabled = true;
     if (linkDark) linkDark.disabled = false;
+
+    // REGRESAR A BLANCO para conservar la estética oscura
+    palabrasClave.forEach(el => {
+      el.style.setProperty('color', '#ffffff', 'important');
+    });
+
     console.log("Tema activado: Gótico (Oscuro)");
   } 
   else {
     // MODO PREDETERMINADO: Apagamos ambos archivos nuevos
     if (linkLight) linkLight.disabled = true;
     if (linkDark) linkDark.disabled = true;
+
+    // REGRESAR A BLANCO para el tema original
+    palabrasClave.forEach(el => {
+      el.style.setProperty('color', '#ffffff', 'important');
+    });
+
     console.log("Tema activado: Predeterminado (Luis)");
   }
 }
