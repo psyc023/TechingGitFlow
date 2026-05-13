@@ -2495,3 +2495,36 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 });
+
+/* =========================
+   Lógica de Temas (Palanca de Cambios)
+========================= */
+let contadorTemas = 0; // 0 = Predeterminado (Luis), 1 = Apple (Claro), 2 = Gótico (Oscuro)
+
+function palancaDeCambios() {
+  // Rotamos entre 0, 1 y 2
+  contadorTemas = (contadorTemas + 1) % 3;
+
+  // Obtenemos las referencias de los links en el HTML
+  const linkLight = document.getElementById('theme-light');
+  const linkDark = document.getElementById('theme-dark');
+
+  if (contadorTemas === 1) {
+    // MODO APPLE: Activamos el CSS claro y apagamos el oscuro
+    if (linkLight) linkLight.disabled = false;
+    if (linkDark) linkDark.disabled = true;
+    console.log("Tema activado: Apple (Claro)");
+  } 
+  else if (contadorTemas === 2) {
+    // MODO GÓTICO: Activamos el CSS oscuro y apagamos el claro
+    if (linkLight) linkLight.disabled = true;
+    if (linkDark) linkDark.disabled = false;
+    console.log("Tema activado: Gótico (Oscuro)");
+  } 
+  else {
+    // MODO PREDETERMINADO: Apagamos ambos archivos nuevos
+    if (linkLight) linkLight.disabled = true;
+    if (linkDark) linkDark.disabled = true;
+    console.log("Tema activado: Predeterminado (Luis)");
+  }
+}
