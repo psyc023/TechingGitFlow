@@ -1,23 +1,206 @@
 :root {
-    --bg-primary: #050505;        /* Negro casi absoluto */
-    --bg-secondary: #0a0a0a;      /* Negro sidebar */
-    --bg-card: #121212;           /* Cards ligeramente visibles */
-    --bg-hover: rgba(139, 0, 0, 0.1);
-    --border-color: rgba(145, 123, 100, 0.2); /* Bronce/Sepia muy sutil */
-    --text-primary: #d4d4d2;      /* Crema/Hueso de la imagen de medusas */
-    --text-secondary: #8b0000;    /* Rojo sangre oscuro */
-    --primary-color: #5c4d3c;     /* Sepia oscuro */
-    --danger-color: #4a0404;
-    --success-color: #1e2a1e;
+    --bg-primary: #1a0c0a;        /* Marrón muy oscuro */
+    --bg-secondary: #2a1614;      /* Marrón oscuro para sidebar */
+    --bg-card: #3d1f1a;           /* Cards con toque rojo */
+    --bg-hover: rgba(196, 30, 58, 0.15);
+    --border-color: rgba(196, 30, 58, 0.2); /* Rojo sutil */
+    --text-primary: #f5e6e0;      /* Crema claro */
+    --text-secondary: #c8a89a;    /* Beige apagado */
+    --primary-color: #c41e3a;     /* Rojo oscuro característico */
+    --danger-color: #ff5722;      /* Naranja */
+    --success-color: #8B2F2F;     /* Rojo oscuro */
     --blur: blur(15px);
 }
 
-/* Gradiente gótico para el fondo */
+/* Gradiente marrón-rojo-naranja para el fondo */
 body {
-    background: linear-gradient(135deg, #050505, #0a0a0a, #121212) !important;
+    background: linear-gradient(180deg, 
+        #1a0c0a 0%,
+        #4a1f1a 50%,
+        #5a2a1a 100%) !important;
 }
 
 .logo-icon, .add-password-btn {
-    background: linear-gradient(135deg, #4a0404, #2a0202) !important; /* Botones góticos */
-    box-shadow: 0 10px 30px rgba(74, 4, 4, 0.3);
+    background: linear-gradient(135deg, #c41e3a, #ff5722) !important;
+    box-shadow: 0 10px 30px rgba(196, 30, 58, 0.3);
+}
+
+/* Estilos armoniosos para pestañas rojo-naranja */
+.vault-tab {
+    border: 1px solid rgba(255, 87, 34, 0.4) !important;
+    background: rgba(255, 87, 34, 0.12) !important;
+    color: #ff5722 !important;
+    font-weight: 600;
+}
+
+.vault-tab:hover,
+.vault-tab.active {
+    background: rgba(196, 30, 58, 0.18) !important;
+    color: #ff5722 !important;
+    border-color: rgba(255, 87, 34, 0.6) !important;
+}
+
+/* Main content */
+.main-content {
+    background: rgba(42, 22, 20, 0.6) !important;
+    border: 1px solid rgba(196, 30, 58, 0.2);
+    box-shadow: 0 8px 32px rgba(196, 30, 58, 0.1) !important;
+}
+
+/* Menú items con armonía rojo */
+.menu a.active {
+    background: linear-gradient(135deg, rgba(196, 30, 58, 0.2), rgba(255, 87, 34, 0.15)) !important;
+    color: #ff5722 !important;
+    border: 1px solid rgba(196, 30, 58, 0.3) !important;
+    box-shadow: 0 4px 12px rgba(196, 30, 58, 0.15) !important;
+}
+
+/* Links en el menú */
+.menu a {
+    color: #f5e6e0 !important;
+}
+
+.menu a:hover {
+    color: #ff5722 !important;
+    background: rgba(196, 30, 58, 0.12) !important;
+}
+
+/* Sidebar items con color rojo-naranja */
+.sidebar-action-btn {
+    color: #f5e6e0 !important;
+    background: rgba(196, 30, 58, 0.1) !important;
+    border: 1px solid rgba(196, 30, 58, 0.15) !important;
+}
+
+.sidebar-action-btn:hover {
+    background: rgba(196, 30, 58, 0.18) !important;
+    color: #ff5722 !important;
+}
+
+/* Textos del sidebar */
+.sidebar h4,
+.sidebar span {
+    color: #f5e6e0 !important;
+}
+
+/* Perfil del sidebar */
+.sidebar-profile {
+    background: rgba(196, 30, 58, 0.1) !important;
+    border: 1px solid rgba(196, 30, 58, 0.2) !important;
+}
+
+.sidebar-profile h5,
+.sidebar-profile span {
+    color: #f5e6e0 !important;
+}
+
+/* Contador de pendientes */
+.pending-counter {
+    background: rgba(255, 87, 34, 0.2) !important;
+    color: #ff5722 !important;
+    font-weight: 700;
+}
+
+/* Elementos del sidebar con color rojo */
+.sidebar-pending-btn {
+    color: #f5e6e0 !important;
+    background: rgba(196, 30, 58, 0.12) !important;
+    border: 1px solid rgba(196, 30, 58, 0.2) !important;
+}
+
+.sidebar-pending-btn:hover {
+    background: rgba(196, 30, 58, 0.18) !important;
+}
+
+.sidebar-pending-btn.active {
+    background: linear-gradient(135deg, rgba(196, 30, 58, 0.2), rgba(255, 87, 34, 0.15)) !important;
+    color: #ff5722 !important;
+    border: 1px solid rgba(196, 30, 58, 0.3) !important;
+}
+
+/* Section items - rojo-naranja */
+.sidebar-section-item {
+    color: #f5e6e0 !important;
+    background: rgba(196, 30, 58, 0.1) !important;
+    border: none !important;
+}
+
+.sidebar-section-item.active,
+.sidebar-section-item:hover {
+    background: linear-gradient(135deg, rgba(196, 30, 58, 0.2), rgba(255, 87, 34, 0.12)) !important;
+    color: #ff5722 !important;
+    border: 1px solid rgba(196, 30, 58, 0.2) !important;
+}
+
+/* Profile avatar - rojo oscuro a naranja */
+.profile-avatar {
+    background: linear-gradient(135deg, #c41e3a, #ff5722) !important;
+    color: white !important;
+}
+
+/* Buttons with # icon rojo-naranja */
+.sidebar-section-icon {
+    background: linear-gradient(135deg, #c41e3a, #ff5722) !important;
+    color: white !important;
+    border-radius: 12px !important;
+}
+
+/* Sidebar links and text colors */
+.sidebar-section-item span {
+    color: #f5e6e0 !important;
+}
+
+.sidebar-section-item.active span {
+    color: #ff5722 !important;
+    font-weight: 700 !important;
+}
+
+/* Main content */
+.hero-section h1,
+.hero-section h2,
+.vault-card h3,
+.vault-card-title {
+    color: #f5e6e0 !important;
+}
+
+.hero-section p,
+.vault-card-info {
+    color: #c8a89a !important;
+}
+
+/* Botones de acción */
+.btn-primary,
+.action-btn {
+    background: #c41e3a !important;
+    border-color: #c41e3a !important;
+}
+
+.btn-primary:hover,
+.action-btn:hover {
+    background: #ff5722 !important;
+    border-color: #ff5722 !important;
+}
+
+.btn-danger {
+    background: #ff5722 !important;
+}
+
+.btn-success {
+    background: #8B2F2F !important;
+}
+
+/* Vault cards */
+.vault-card {
+    background: rgba(61, 31, 26, 0.7) !important;
+    border: 1px solid rgba(196, 30, 58, 0.3) !important;
+}
+
+.vault-card:hover {
+    border-color: rgba(255, 87, 34, 0.5) !important;
+    box-shadow: 0 8px 24px rgba(196, 30, 58, 0.15) !important;
+}
+
+/* Íconos con color rojo-naranja */
+.bi-lock, .bi-star, .bi-trash, .bi-pencil {
+    color: #ff5722 !important;
 }
