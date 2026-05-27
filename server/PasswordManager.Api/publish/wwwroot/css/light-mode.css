@@ -1,0 +1,212 @@
+:root {
+    --bg-primary: #f5fffe;           /* Blanco casi transparente con toque turquesa */
+    --bg-secondary: #ffffff;         /* Blanco puro para sidebar/cards */
+    --bg-card: #f0fffe;              /* Menta muy claro para cards */
+    --bg-hover: #e0f7f5;             /* Menta claro para hover */
+    --border-color: rgba(27, 162, 159, 0.12);
+    --text-primary: #2d5553;         /* Verde azulado profundo */
+    --text-secondary: #5a8986;       /* Gris verde */
+    --primary-color: #1ba29f;        /* Turquesa oscuro característico */
+    --danger-color: #ff6b9d;         /* Rosa coral armónico */
+    --success-color: #5eccc0;        /* Menta turquesa */
+    --blur: blur(10px);
+}
+
+/* Fondo con gradiente suave turquesa-menta-rosa */
+body {
+    background: linear-gradient(180deg, 
+        #f5fffe 0%,
+        #e8f9f7 40%,
+        #f5d5e0 100%) !important;
+}
+
+.main-content {
+    background: rgba(255, 255, 255, 0.8) !important;
+    border: 1px solid rgba(27, 162, 159, 0.12);
+    box-shadow: 0 8px 32px rgba(27, 162, 159, 0.08) !important;
+}
+
+/* Estilos armoniosos para pestañas turquesa-menta */
+.vault-tab {
+    border: 1px solid rgba(94, 204, 192, 0.4) !important;
+    background: rgba(94, 204, 192, 0.1) !important;
+    color: #1ba29f !important;
+    font-weight: 600;
+}
+
+.vault-tab:hover,
+.vault-tab.active {
+    background: rgba(27, 162, 159, 0.15) !important;
+    color: #0f7370 !important;
+    border-color: rgba(27, 162, 159, 0.6) !important;
+}
+
+/* Menú items con armonía turquesa */
+.menu a.active {
+    background: linear-gradient(135deg, rgba(94, 204, 192, 0.15), rgba(27, 162, 159, 0.1)) !important;
+    color: #0f7370 !important;
+    border: 1px solid rgba(27, 162, 159, 0.3) !important;
+    box-shadow: 0 4px 12px rgba(27, 162, 159, 0.1) !important;
+}
+
+/* Sidebar pending button con armonía */
+.sidebar-pending-btn.active {
+    background: linear-gradient(135deg, rgba(94, 204, 192, 0.15), rgba(27, 162, 159, 0.1)) !important;
+    color: #0f7370 !important;
+    border: 1px solid rgba(27, 162, 159, 0.2) !important;
+}
+
+/* Logo y botones con color turquesa */
+.add-password-btn {
+    background: linear-gradient(135deg, #1ba29f, #0f7370) !important;
+    box-shadow: 0 8px 20px rgba(27, 162, 159, 0.2) !important;
+}
+
+.logo-icon {
+    background: linear-gradient(135deg, #1ba29f, #5eccc0) !important;
+    box-shadow: 0 4px 12px rgba(27, 162, 159, 0.15) !important;
+}
+
+/* Sidebar items con mejor visibilidad */
+.sidebar-action-btn {
+    color: #2d5553 !important;
+    background: rgba(94, 204, 192, 0.08) !important;
+    border: 1px solid rgba(94, 204, 192, 0.15) !important;
+}
+
+.sidebar-action-btn:hover {
+    background: rgba(94, 204, 192, 0.15) !important;
+    color: #0f7370 !important;
+}
+
+/* Links en el menú */
+.menu a {
+    color: #2d5553 !important;
+}
+
+.menu a:hover {
+    color: #0f7370 !important;
+    background: rgba(94, 204, 192, 0.08) !important;
+}
+
+/* Textos del sidebar */
+.sidebar h4,
+.sidebar span {
+    color: #2d5553 !important;
+}
+
+/* Perfil del sidebar */
+.sidebar-profile {
+    background: rgba(94, 204, 192, 0.08) !important;
+    border: 1px solid rgba(94, 204, 192, 0.2) !important;
+}
+
+.sidebar-profile h5,
+.sidebar-profile span {
+    color: #2d5553 !important;
+}
+
+/* Contador de pendientes */
+.pending-counter {
+    background: rgba(255, 107, 157, 0.15) !important;
+    color: #ff6b9d !important;
+    font-weight: 700;
+}
+
+/* Elementos del sidebar con color turquesa */
+.sidebar-pending-btn {
+    color: #2d5553 !important;
+    background: rgba(27, 162, 159, 0.12) !important;
+    border: 1px solid rgba(27, 162, 159, 0.2) !important;
+}
+
+.sidebar-pending-btn:hover {
+    background: rgba(27, 162, 159, 0.18) !important;
+}
+
+/* Section items - cambiar del púrpura al turquesa */
+.sidebar-section-item {
+    color: #2d5553 !important;
+    background: rgba(27, 162, 159, 0.1) !important;
+    border: none !important;
+}
+
+.sidebar-section-item.active,
+.sidebar-section-item:hover {
+    background: linear-gradient(135deg, rgba(27, 162, 159, 0.18), rgba(94, 204, 192, 0.12)) !important;
+    color: #0f7370 !important;
+    border: 1px solid rgba(27, 162, 159, 0.15) !important;
+}
+
+/* Profile avatar - turquesa en lugar de púrpura */
+.profile-avatar {
+    background: linear-gradient(135deg, #1ba29f, #5eccc0) !important;
+    color: white !important;
+}
+
+/* Buttons with # icon turquesa */
+.sidebar-section-icon {
+    background: linear-gradient(135deg, #1ba29f, #0f7370) !important;
+    color: white !important;
+    border-radius: 12px !important;
+}
+
+/* Sidebar links and text colors */
+.sidebar-section-item span {
+    color: #2d5553 !important;
+}
+
+.sidebar-section-item.active span {
+    color: #0f7370 !important;
+    font-weight: 700 !important;
+}
+
+/* Main content */
+.hero-section h1,
+.hero-section h2,
+.vault-card h3,
+.vault-card-title {
+    color: #0f7370 !important;
+}
+
+.hero-section p,
+.vault-card-info {
+    color: #5a8986 !important;
+}
+
+/* Botones de acción */
+.btn-primary,
+.action-btn {
+    background: #1ba29f !important;
+    border-color: #1ba29f !important;
+}
+
+.btn-primary:hover,
+.action-btn:hover {
+    background: #0f7370 !important;
+    border-color: #0f7370 !important;
+}
+
+.btn-danger {
+    background: #ff6b9d !important;
+}
+
+.btn-success {
+    background: #5eccc0 !important;
+}
+
+/* Vault cards */
+.vault-card {
+    background: #ffffff !important;
+    border: 1px solid rgba(94, 204, 192, 0.25) !important;
+}
+
+.vault-card:hover {
+    border-color: rgba(27, 162, 159, 0.4) !important;
+    box-shadow: 0 8px 24px rgba(27, 162, 159, 0.12) !important;
+}
+
+/* Íconos con color turquesa */
+.bi-lock, .bi-star, .bi-trash, .bi-pencil {
+    color: #1ba29f !important;
+}

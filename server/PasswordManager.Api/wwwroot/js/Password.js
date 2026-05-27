@@ -26,6 +26,8 @@ const LINKS_JSON_FILE_NAME = "links-history.json";
 const PENDING_JSON_FILE_NAME = "pending-history.json";
 const SECTIONS_STORAGE_KEY = "password-manager-sections";
 
+const API_BASE_URL = "/api";
+
 /* =========================
    IndexedDB
 ========================= */
@@ -120,30 +122,25 @@ function getActiveSections() {
   return sections.filter(section => section.active !== false);
 }
 
-function loadSectionsFromLocalStorage() {
-  const savedSections = localStorage.getItem(SECTIONS_STORAGE_KEY);
-
-  if (!savedSections) {
-    sections = [];
-    return;
-  }
-
+async function loadSectionsFromLocalStorage() {
   try {
-    const parsedSections = JSON.parse(savedSections);
+    const response = await fetch(`${API_BASE_URL}/sections`);
 
-    sections = Array.isArray(parsedSections)
-      ? parsedSections
-          .filter(section => section && section.name)
-          .map(normalizeSection)
-      : [];
+    if (!response.ok) {
+      throw new Error("Error al cargar secciones");
+    }
+
+    const data = await response.json();
+
+    sections = data.map(normalizeSection);
   } catch (error) {
-    console.warn("No se pudieron cargar las secciones:", error);
+    console.error("Error cargando secciones:", error);
     sections = [];
   }
 }
 
 function saveSectionsToLocalStorage() {
-  localStorage.setItem(SECTIONS_STORAGE_KEY, JSON.stringify(sections));
+  return true;
 }
 
 function getSectionName(sectionId) {
@@ -331,76 +328,37 @@ async function saveSectionsToJsonFile() {
 }
 
 async function loadPasswordsFromJsonFile(autoMode = false) {
-  const hasFile = await ensureJsonFile(autoMode);
-  if (!hasFile) return false;
+  try {
+    const response = await fetch(`${API_BASE_URL}/passwords`);
 
-  const file = await passwordFileHandle.getFile();
-  const text = await file.text();
+    if (!response.ok) {
+      throw new Error("Error al cargar contraseñas");
+    }
 
-  if (!text.trim()) {
-    passwords = [];
-    await writeJsonArray(passwordFileHandle, []);
+    const data = await response.json();
 
-    const loadedSections = await loadSectionsFromJsonFile(autoMode);
-    if (!loadedSections) return false;
-
-    const loadedLinks = await loadLinksFromJsonFile(autoMode);
-    if (!loadedLinks) return false;
-
-    const loadedPendingTasks = await loadPendingTasksFromJsonFile(autoMode);
-    if (!loadedPendingTasks) return false;
+    passwords = data.map(item => ({
+      id: item.id,
+      platform: item.platform || item.site || "",
+      platformUrl: item.platformUrl || "",
+      username: item.username || "",
+      email: item.email || "",
+      password: item.password || "",
+      sectionId: item.sectionId || "",
+      note: item.note || item.notes || "",
+      active: item.active ?? true,
+      deletedAt: item.deletedAt || "",
+      createdAt: item.createdAt || nowText(),
+      updatedAt: item.updatedAt || nowText()
+    }));
 
     historyLoaded = true;
     return true;
-  }
-
-  let data;
-
-  try {
-    data = JSON.parse(text);
   } catch (error) {
-    console.error("JSON inválido:", error);
-
-    if (!autoMode) {
-      alert("El archivo passwords-history.json tiene formato inválido.");
-    }
-
+    console.error("Error cargando desde API:", error);
+    alert("No se pudieron cargar las contraseñas desde la API.");
     return false;
   }
-
-  if (!Array.isArray(data)) {
-    if (!autoMode) {
-      alert("El historial debe ser un arreglo JSON.");
-    }
-    return false;
-  }
-
-  passwords = data.map(item => ({
-    id: item.id || generateId(),
-    platform: item.platform || "",
-    platformUrl: item.platformUrl || item.pageLink || "",
-    username: item.username || item.usuario || "",
-    email: item.email || item.correo || "",
-    password: item.password || item.contraseña || "",
-    sectionId: item.sectionId || "",
-    note: item.note || item.notes || "",
-    active: item.active ?? !item.deletedAt,
-    deletedAt: item.deletedAt || "",
-    createdAt: item.createdAt || nowText(),
-    updatedAt: item.updatedAt || nowText()
-  }));
-
-  const loadedSections = await loadSectionsFromJsonFile(autoMode);
-  if (!loadedSections) return false;
-
-  const loadedLinks = await loadLinksFromJsonFile(autoMode);
-  if (!loadedLinks) return false;
-
-  const loadedPendingTasks = await loadPendingTasksFromJsonFile(autoMode);
-  if (!loadedPendingTasks) return false;
-
-  historyLoaded = true;
-  return true;
 }
 
 function refreshHistoryUi(loadButton = null) {
@@ -463,182 +421,76 @@ async function initializeHistoryWithTimeout(loadButton = null, timeoutMs = 3000)
 }
 
 async function savePasswordsToJsonFile() {
-  if (!historyLoaded) {
-    alert("Primero carga el historial antes de guardar cambios.");
-    return;
-  }
-
-  const hasFile = await ensureJsonFile(false);
-  if (!hasFile) return;
-
-  const data = passwords.map(item => ({
-    id: item.id,
-    platform: item.platform,
-    platformUrl: item.platformUrl || "",
-    username: item.username,
-    email: item.email,
-    password: item.password,
-    sectionId: item.sectionId || "",
-    note: item.note || "",
-    active: item.active ?? true,
-    deletedAt: item.deletedAt || "",
-    createdAt: item.createdAt,
-    updatedAt: item.updatedAt
-  }));
-
-  const writable = await passwordFileHandle.createWritable();
-  await writable.write(JSON.stringify(data, null, 2));
-  await writable.close();
+  return true;
 }
 
 async function loadLinksFromJsonFile(autoMode = false) {
-  const hasFile = await ensureJsonFile(autoMode);
-  if (!hasFile) return false;
-
-  const file = await linkFileHandle.getFile();
-  const text = await file.text();
-
-  if (!text.trim()) {
-    links = [];
-    await writeJsonArray(linkFileHandle, []);
-    return true;
-  }
-
-  let data;
-
   try {
-    data = JSON.parse(text);
+    const response = await fetch(`${API_BASE_URL}/links`);
+
+    if (!response.ok) {
+      throw new Error("Error al cargar links");
+    }
+
+    const data = await response.json();
+
+    links = data.map(item => ({
+      id: item.id,
+      name: item.title || item.name || "",
+      title: item.title || item.name || "",
+      url: item.url || "",
+      sectionId: item.sectionId || "",
+      active: item.active ?? true,
+      deletedAt: item.deletedAt || "",
+      createdAt: item.createdAt || nowText(),
+      updatedAt: item.updatedAt || nowText()
+    }));
+
+    return true;
   } catch (error) {
-    console.error("JSON de links invalido:", error);
-
-    if (!autoMode) {
-      alert("El archivo links-history.json tiene formato invalido.");
-    }
-
+    console.error("Error cargando links:", error);
+    alert("No se pudieron cargar los links.");
     return false;
   }
-
-  if (!Array.isArray(data)) {
-    if (!autoMode) {
-      alert("El historial de links debe ser un arreglo JSON.");
-    }
-
-    return false;
-  }
-
-  links = data.map(item => ({
-    id: item.id || generateId(),
-    name: item.name || item.title || "",
-    url: item.url || item.link || "",
-    sectionId: item.sectionId || "",
-    note: item.note || item.notes || "",
-    active: item.active ?? !item.deletedAt,
-    deletedAt: item.deletedAt || "",
-    createdAt: item.createdAt || nowText(),
-    updatedAt: item.updatedAt || nowText()
-  }));
-
-  return true;
 }
 
 async function saveLinksToJsonFile() {
-  if (!historyLoaded) {
-    alert("Primero carga el historial antes de guardar cambios.");
-    return;
-  }
-
-  const hasFile = await ensureJsonFile(false);
-  if (!hasFile) return;
-
-  const data = links.map(item => ({
-    id: item.id,
-    name: item.name,
-    url: item.url,
-    sectionId: item.sectionId || "",
-    note: item.note || "",
-    active: item.active ?? true,
-    deletedAt: item.deletedAt || "",
-    createdAt: item.createdAt,
-    updatedAt: item.updatedAt
-  }));
-
-  const writable = await linkFileHandle.createWritable();
-  await writable.write(JSON.stringify(data, null, 2));
-  await writable.close();
-}
-
-async function loadPendingTasksFromJsonFile(autoMode = false) {
-  const hasFile = await ensureJsonFile(autoMode);
-  if (!hasFile) return false;
-
-  const file = await pendingFileHandle.getFile();
-  const text = await file.text();
-
-  if (!text.trim()) {
-    pendingTasks = [];
-    await writeJsonArray(pendingFileHandle, []);
-    return true;
-  }
-
-  let data;
-
-  try {
-    data = JSON.parse(text);
-  } catch (error) {
-    console.error("JSON de pendientes invalido:", error);
-
-    if (!autoMode) {
-      alert("El archivo pending-history.json tiene formato invalido.");
-    }
-
-    return false;
-  }
-
-  if (!Array.isArray(data)) {
-    if (!autoMode) {
-      alert("El historial de pendientes debe ser un arreglo JSON.");
-    }
-
-    return false;
-  }
-
-  pendingTasks = data.map(item => ({
-    id: item.id || generateId(),
-    title: item.title || "",
-    company: item.company || item.compania || "",
-    description: item.description || item.descripcion || "",
-    dueDate: item.dueDate || item.fechaLimite || "",
-    color: ["green", "yellow", "red"].includes(item.color) ? item.color : "green",
-    createdAt: item.createdAt || nowText(),
-    updatedAt: item.updatedAt || nowText()
-  }));
-
   return true;
 }
 
-async function savePendingTasksToJsonFile() {
-  if (!historyLoaded) {
-    alert("Primero carga el historial antes de guardar cambios.");
-    return;
+async function loadPendingTasksFromJsonFile(autoMode = false) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/pending-tasks`);
+
+    if (!response.ok) {
+      throw new Error("Error al cargar pendientes");
+    }
+
+    const data = await response.json();
+
+    pendingTasks = data.map(item => ({
+      id: item.id,
+      title: item.title || "",
+      company: item.company || "",
+      description: item.description || "",
+      dueDate: item.dueDate || "",
+      color: item.color || "green",
+      active: item.active ?? true,
+      deletedAt: item.deletedAt || "",
+      createdAt: item.createdAt || nowText(),
+      updatedAt: item.updatedAt || nowText()
+    }));
+
+    return true;
+  } catch (error) {
+    console.error("Error cargando pendientes:", error);
+    alert("No se pudieron cargar los pendientes.");
+    return false;
   }
+}
 
-  const hasFile = await ensureJsonFile(false);
-  if (!hasFile) return;
-
-  const data = pendingTasks.map(item => ({
-    id: item.id,
-    title: item.title,
-    company: item.company,
-    description: item.description,
-    dueDate: item.dueDate,
-    color: item.color,
-    createdAt: item.createdAt,
-    updatedAt: item.updatedAt
-  }));
-
-  const writable = await pendingFileHandle.createWritable();
-  await writable.write(JSON.stringify(data, null, 2));
-  await writable.close();
+async function savePendingTasksToJsonFile() {
+  return true;
 }
 
 /* =========================
@@ -1348,25 +1200,32 @@ async function createSection(sectionName) {
 }
 
 async function createNewSection(name) {
-  const normalizedName = name.trim();
+  const response = await fetch(`${API_BASE_URL}/sections`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      name: name.trim(),
+      active: true
+    })
+  });
 
-  const newSection = {
-    id: generateId(),
-    name: normalizedName,
-    createdAt: nowText(),
-    updatedAt: nowText(),
-    active: true,
-    deletedAt: ""
-  };
+  if (!response.ok) {
+    alert("No se pudo crear la sección.");
+    return false;
+  }
 
-  sections.push(newSection);
+  const newSection = await response.json();
+
+  sections.push(normalizeSection(newSection));
   selectedSectionId = newSection.id;
 
-  await saveSectionsToJsonFile();
   renderSections();
   renderCurrentView();
   populateAddPasswordSectionSelect();
   populateAddLinkSectionSelect();
+
   return true;
 }
 
@@ -1398,45 +1257,41 @@ function openRestoreSectionPrompt(sectionId, sectionName) {
 }
 
 async function restoreInactiveSection(id) {
-  const restoredAt = nowText();
   const section = sections.find(item => item.id === id && item.active === false);
   if (!section) return false;
 
-  section.active = true;
-  section.deletedAt = "";
-  section.updatedAt = restoredAt;
+  const payload = {
+    ...section,
+    active: true,
+    deletedAt: ""
+  };
 
-  passwords = passwords.map(item =>
-    item.sectionId === id
-      ? {
-          ...item,
-          active: true,
-          deletedAt: "",
-          updatedAt: restoredAt
-        }
-      : item
-  );
+  const response = await fetch(`${API_BASE_URL}/sections/${id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
 
-  links = links.map(item =>
-    item.sectionId === id
-      ? {
-          ...item,
-          active: true,
-          deletedAt: "",
-          updatedAt: restoredAt
-        }
-      : item
+  if (!response.ok) {
+    alert("No se pudo restaurar la sección.");
+    return false;
+  }
+
+  const restoredSection = await response.json();
+
+  sections = sections.map(item =>
+    item.id === id ? normalizeSection(restoredSection) : item
   );
 
   selectedSectionId = id;
 
-  await saveSectionsToJsonFile();
-  await savePasswordsToJsonFile();
-  await saveLinksToJsonFile();
   renderSections();
   renderCurrentView();
   populateAddPasswordSectionSelect();
   populateAddLinkSectionSelect();
+
   return true;
 }
 
@@ -1448,37 +1303,70 @@ async function updateSection(id, sectionName) {
     return false;
   }
 
-  const section = sections.find(item => item.id === id && item.active !== false);
+  const section = sections.find(item => item.id === id);
   if (!section) return false;
 
-  section.name = name;
-  section.updatedAt = nowText();
+  const payload = {
+    ...section,
+    name,
+    active: true
+  };
 
-  await saveSectionsToJsonFile();
+  const response = await fetch(`${API_BASE_URL}/sections/${id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    alert("No se pudo actualizar la sección.");
+    return false;
+  }
+
+  const savedSection = await response.json();
+
+  sections = sections.map(item =>
+    item.id === id ? normalizeSection(savedSection) : item
+  );
+
   renderSections();
   renderCurrentView();
   populateAddPasswordSectionSelect();
   populateAddLinkSectionSelect();
+
   return true;
 }
 
 async function softDeleteSection(id) {
-  const section = sections.find(item => item.id === id && item.active !== false);
-  if (!section) return false;
+  const response = await fetch(`${API_BASE_URL}/sections/${id}`, {
+    method: "DELETE"
+  });
 
-  const deletedAt = nowText();
+  if (!response.ok) {
+    alert("No se pudo eliminar la sección.");
+    return false;
+  }
 
-  section.active = false;
-  section.deletedAt = deletedAt;
-  section.updatedAt = deletedAt;
+  sections = sections.map(item =>
+    item.id === id
+      ? {
+          ...item,
+          active: false,
+          deletedAt: nowText(),
+          updatedAt: nowText()
+        }
+      : item
+  );
 
   passwords = passwords.map(item =>
     item.sectionId === id
       ? {
           ...item,
           active: false,
-          deletedAt,
-          updatedAt: deletedAt
+          deletedAt: nowText(),
+          updatedAt: nowText()
         }
       : item
   );
@@ -1488,8 +1376,8 @@ async function softDeleteSection(id) {
       ? {
           ...item,
           active: false,
-          deletedAt,
-          updatedAt: deletedAt
+          deletedAt: nowText(),
+          updatedAt: nowText()
         }
       : item
   );
@@ -1498,13 +1386,11 @@ async function softDeleteSection(id) {
     selectedSectionId = "";
   }
 
-  await saveSectionsToJsonFile();
-  await savePasswordsToJsonFile();
-  await saveLinksToJsonFile();
   renderSections();
   renderCurrentView();
   populateAddPasswordSectionSelect();
   populateAddLinkSectionSelect();
+
   return true;
 }
 
@@ -1513,164 +1399,194 @@ function getPasswordSectionId(sectionId) {
 }
 
 async function createPassword(passwordData) {
-  if (!historyLoaded) {
-    alert("Primero carga el historial.");
-    return false;
-  }
-
-  const sectionId = getPasswordSectionId(passwordData.sectionId);
-
-  if (!sectionId) {
-    alert("Selecciona una seccion para guardar la contraseña.");
-    return false;
-  }
-
   const newPassword = {
-    id: generateId(),
     platform: passwordData.platform,
     platformUrl: normalizeUrl(passwordData.platformUrl || ""),
     username: passwordData.username,
     email: passwordData.email,
     password: passwordData.password,
-    sectionId,
+    sectionId: passwordData.sectionId || "",
     note: "",
-    active: true,
-    deletedAt: "",
-    createdAt: nowText(),
-    updatedAt: nowText()
+    active: true
   };
 
-  passwords.push(newPassword);
+  const response = await fetch(`${API_BASE_URL}/passwords`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(newPassword)
+  });
+
+  if (!response.ok) {
+    alert("No se pudo guardar la contraseña.");
+    return false;
+  }
+
+  const savedPassword = await response.json();
+
+  passwords.unshift({
+    ...savedPassword,
+    platform: savedPassword.platform || savedPassword.site || "",
+    note: savedPassword.note || savedPassword.notes || ""
+  });
+
   renderPasswords();
-  await savePasswordsToJsonFile();
   return true;
 }
 
 async function createLink(linkData) {
-  if (!historyLoaded) {
-    alert("Primero carga el historial.");
-    return false;
-  }
-
   const sectionId = getPasswordSectionId(linkData.sectionId);
 
   if (!sectionId) {
-    alert("Selecciona una seccion para guardar el link.");
+    alert("Selecciona una sección para guardar el link.");
     return false;
   }
 
-  const url = normalizeUrl(linkData.url);
-
-  if (!url) {
-    alert("Ingresa un link valido.");
-    return false;
-  }
-
-  const newLink = {
-    id: generateId(),
-    name: linkData.name,
-    url,
+  const payload = {
+    title: linkData.title || linkData.name,
+    url: normalizeUrl(linkData.url),
     sectionId,
-    note: "",
-    active: true,
-    deletedAt: "",
-    createdAt: nowText(),
-    updatedAt: nowText()
+    active: true
   };
 
-  links.push(newLink);
-  renderCurrentView();
-  await saveLinksToJsonFile();
-  return true;
-}
+  const response = await fetch(`${API_BASE_URL}/links`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
 
-async function updateLink(id, updatedData) {
-  if (!historyLoaded) {
-    alert("Primero carga el historial.");
+  if (!response.ok) {
+    alert("No se pudo guardar el link.");
     return false;
   }
 
+  const savedLink = await response.json();
+
+  links.unshift({
+  ...savedLink,
+  name: savedLink.title || savedLink.name || "",
+  title: savedLink.title || savedLink.name || ""
+});
+
+  renderCurrentView();
+
+  return true;
+}
+async function updateLink(id, updatedData) {
   const sectionId = getPasswordSectionId(updatedData.sectionId);
 
   if (!sectionId) {
-    alert("Selecciona una seccion para guardar el link.");
+    alert("Selecciona una sección para guardar el link.");
     return false;
   }
 
-  const url = normalizeUrl(updatedData.url);
+  const payload = {
+  title: updatedData.title || updatedData.name,
+  url: normalizeUrl(updatedData.url),
+  sectionId,
+  active: true
+};
 
-  if (!url) {
-    alert("Ingresa un link valido.");
+  const response = await fetch(`${API_BASE_URL}/links/${id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    alert("No se pudo actualizar el link.");
     return false;
   }
+
+  const savedLink = await response.json();
 
   links = links.map(item =>
     item.id === id
-      ? {
-          ...item,
-          name: updatedData.name,
-          url,
-          sectionId,
-          updatedAt: nowText()
-        }
-      : item
+  ? {
+      ...savedLink,
+      name: savedLink.title || savedLink.name || "",
+      title: savedLink.title || savedLink.name || ""
+    }
+  : item
   );
 
-  renderLinks();
-  await saveLinksToJsonFile();
+  renderCurrentView();
+
   return true;
 }
 
 async function createPendingTask(pendingData) {
-  if (!historyLoaded) {
-    alert("Primero carga el historial.");
-    return false;
-  }
-
-  const newPendingTask = {
-    id: generateId(),
+  const payload = {
     title: pendingData.title,
     company: pendingData.company,
     description: pendingData.description,
     dueDate: pendingData.dueDate,
     color: pendingData.color,
-    createdAt: nowText(),
-    updatedAt: nowText()
+    active: true
   };
 
-  pendingTasks.push(newPendingTask);
+  const response = await fetch(`${API_BASE_URL}/pending-tasks`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    alert("No se pudo guardar el pendiente.");
+    return false;
+  }
+
+  const savedTask = await response.json();
+
+  pendingTasks.unshift(savedTask);
+
   renderPendingTasks();
-  await savePendingTasksToJsonFile();
+
   return true;
 }
 
 async function updatePendingTask(id, updatedData) {
-  if (!historyLoaded) {
-    alert("Primero carga el historial.");
+  const payload = {
+    title: updatedData.title,
+    company: updatedData.company,
+    description: updatedData.description,
+    dueDate: updatedData.dueDate,
+    color: updatedData.color,
+    active: true
+  };
+
+  const response = await fetch(`${API_BASE_URL}/pending-tasks/${id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    alert("No se pudo actualizar el pendiente.");
     return false;
   }
 
+  const savedTask = await response.json();
+
   pendingTasks = pendingTasks.map(item =>
-    item.id === id
-      ? {
-          ...item,
-          ...updatedData,
-          updatedAt: nowText()
-        }
-      : item
+    item.id === id ? savedTask : item
   );
 
   renderPendingTasks();
-  await savePendingTasksToJsonFile();
+
   return true;
 }
 
 async function updatePassword(id, updatedData) {
-  if (!historyLoaded) {
-    alert("Primero carga el historial.");
-    return false;
-  }
-
   const sectionId = getPasswordSectionId(updatedData.sectionId);
 
   if (!sectionId) {
@@ -1678,36 +1594,74 @@ async function updatePassword(id, updatedData) {
     return false;
   }
 
+  const currentPassword = passwords.find(item => item.id === id);
+
+  const payload = {
+    platform: updatedData.platform,
+    platformUrl: normalizeUrl(updatedData.platformUrl || ""),
+    username: updatedData.username,
+    email: updatedData.email,
+    password: updatedData.password,
+    sectionId,
+    note: currentPassword?.note || "",
+    active: true
+  };
+
+  const response = await fetch(`${API_BASE_URL}/passwords/${id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    alert("No se pudo actualizar la contraseña.");
+    return false;
+  }
+
+  const savedPassword = await response.json();
+
   passwords = passwords.map(item =>
     item.id === id
       ? {
-          ...item,
-          ...updatedData,
-          platformUrl: normalizeUrl(updatedData.platformUrl || ""),
-          sectionId,
-          updatedAt: nowText()
+          ...savedPassword,
+          note: savedPassword.note || ""
         }
       : item
   );
 
   renderPasswords();
-  await savePasswordsToJsonFile();
   return true;
 }
 
 async function savePasswordNote(id, note) {
-  if (!historyLoaded) {
-    alert("Primero carga el historial.");
-    return false;
-  }
-
   const item = passwords.find(password => password.id === id);
   if (!item) return false;
 
-  item.note = note.trim();
-  item.updatedAt = nowText();
+  const payload = {
+    ...item,
+    note: note.trim()
+  };
 
-  await savePasswordsToJsonFile();
+  const response = await fetch(`${API_BASE_URL}/passwords/${id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    alert("No se pudo guardar la nota.");
+    return false;
+  }
+
+  const savedPassword = await response.json();
+
+  item.note = savedPassword.note || "";
+  item.updatedAt = savedPassword.updatedAt || nowText();
+
   alert("Nota guardada.");
   return true;
 }
@@ -1730,36 +1684,47 @@ async function saveLinkNote(id, note) {
 }
 
 async function deletePassword(id) {
-  if (!historyLoaded) {
-    alert("Primero carga el historial.");
+  const response = await fetch(`${API_BASE_URL}/passwords/${id}`, {
+    method: "DELETE"
+  });
+
+  if (!response.ok) {
+    alert("No se pudo eliminar la contraseña.");
     return;
   }
 
   passwords = passwords.filter(item => item.id !== id);
   renderPasswords();
-  await savePasswordsToJsonFile();
 }
 
 async function deleteLink(id) {
-  if (!historyLoaded) {
-    alert("Primero carga el historial.");
+  const response = await fetch(`${API_BASE_URL}/links/${id}`, {
+    method: "DELETE"
+  });
+
+  if (!response.ok) {
+    alert("No se pudo eliminar el link.");
     return;
   }
 
   links = links.filter(item => item.id !== id);
-  renderLinks();
-  await saveLinksToJsonFile();
+
+  renderCurrentView();
 }
 
 async function deletePendingTask(id) {
-  if (!historyLoaded) {
-    alert("Primero carga el historial.");
+  const response = await fetch(`${API_BASE_URL}/pending-tasks/${id}`, {
+    method: "DELETE"
+  });
+
+  if (!response.ok) {
+    alert("No se pudo eliminar el pendiente.");
     return;
   }
 
   pendingTasks = pendingTasks.filter(item => item.id !== id);
+
   renderPendingTasks();
-  await savePendingTasksToJsonFile();
 }
 
 /* =========================
@@ -2060,11 +2025,20 @@ function closeInlineSectionForm() {
 ========================= */
 document.addEventListener("DOMContentLoaded", () => {
   document.body.dataset.activeView = selectedView;
+
   updatePendingCounter();
-  loadSectionsFromLocalStorage();
+
+  Promise.all([
+  loadSectionsFromLocalStorage(),
+  loadLinksFromJsonFile(),
+  loadPasswordsFromJsonFile(),
+  loadPendingTasksFromJsonFile()
+]).then(() => {
   renderSections();
+  renderCurrentView();
   populateAddPasswordSectionSelect();
   populateAddLinkSectionSelect();
+});
 
   const toolbar = document.querySelector(".toolbar");
 
