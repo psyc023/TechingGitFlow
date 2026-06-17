@@ -1,1 +1,1 @@
-# TechingGitFlow
+# TeachingGitFlow
